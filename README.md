@@ -13,10 +13,13 @@ See the execution roadmap in [PLAN.md](./PLAN.md).
 
 ## Prerequisites
 
-1. Android SDK installed.
-2. `adb` available in `PATH`.
-3. JDK 17 installed.
+1. JDK 17 installed (`brew install openjdk@17`).
+2. Android command-line tools installed (`brew install --cask android-commandlinetools`).
+3. Android SDK platform-tools installed (`sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools"`).
 4. Android device with Developer Options enabled.
+
+The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
+`~/Library/Android/sdk/platform-tools/adb`, and auto-creates `local.properties`.
 
 ## Quick Start
 

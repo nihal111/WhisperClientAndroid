@@ -1,23 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./env-android.sh
+source "$SCRIPT_DIR/env-android.sh"
+
 pass() { echo "[OK] $1"; }
 fail() { echo "[ERR] $1"; }
 warn() { echo "[WARN] $1"; }
 
-if command -v java >/dev/null 2>&1; then
-  if java -version >/dev/null 2>&1; then
-    pass "Java runtime is available"
+if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/java" ]]; then
+  if "${JAVA_HOME}/bin/java" -version >/dev/null 2>&1; then
+    pass "Java runtime is available (${JAVA_HOME})"
   else
-    fail "java command exists but runtime is not configured"
+    fail "JAVA_HOME is set but java runtime check failed"
   fi
 else
-  fail "java is not installed"
+  fail "Java 17 runtime not found"
 fi
 
-if command -v adb >/dev/null 2>&1; then
-  pass "adb is available"
-  DEVICE_COUNT="$(adb devices | awk 'NR>1 && $2=="device" {count++} END {print count+0}')"
+if [[ -x "${ADB_BIN:-}" ]]; then
+  pass "adb is available (${ADB_BIN})"
+  DEVICE_COUNT="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {count++} END {print count+0}')"
   if [[ "$DEVICE_COUNT" -gt 0 ]]; then
     pass "Detected $DEVICE_COUNT connected device(s)"
   else

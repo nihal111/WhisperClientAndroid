@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v adb >/dev/null 2>&1; then
-  echo "adb is not installed or not in PATH."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./env-android.sh
+source "$SCRIPT_DIR/env-android.sh"
+
+if [[ ! -x "${ADB_BIN:-}" ]]; then
+  echo "adb not found. Install Android SDK platform-tools."
   exit 1
 fi
 
-adb logcat -v time WisprIme:I AndroidRuntime:E ActivityManager:I *:S
+"$ADB_BIN" logcat -v time WisprIme:I AndroidRuntime:E ActivityManager:I *:S
