@@ -24,11 +24,7 @@ object FocusEventEvaluator {
         return try {
             val eventPackage = event.packageName?.toString().orEmpty()
             if (eventPackage == appPackageName) {
-                return FocusTargetState(
-                    hasEditableTarget = false,
-                    hasSensitiveTarget = false,
-                    packageName = eventPackage,
-                )
+                return null
             }
             val state = source.inspectTarget()
             FocusTargetState(
@@ -52,13 +48,17 @@ object FocusEventEvaluator {
         return try {
             val eventPackage = eventPackageName.orEmpty()
             if (eventPackage == appPackageName) {
-                return FocusTargetState(
-                    hasEditableTarget = false,
-                    hasSensitiveTarget = false,
-                    packageName = eventPackage,
-                )
+                return null
             }
-            val state = root.inspectTarget()
+            val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            if (focused == null) {
+                return null
+            }
+            val state = try {
+                inspectNode(focused)
+            } finally {
+                focused.recycle()
+            }
             FocusTargetState(
                 hasEditableTarget = state.hasEditable,
                 hasSensitiveTarget = state.hasSensitive,
