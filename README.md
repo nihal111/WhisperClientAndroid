@@ -27,6 +27,7 @@ The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
 ```bash
 ./scripts/dev-doctor.sh
 ./scripts/dev-install.sh
+./scripts/dev-launch-app.sh
 ./scripts/dev-logcat.sh
 ```
 
@@ -67,4 +68,10 @@ Example:
 
 ```bash
 ./scripts/dev-restart-ime.sh
+```
+
+### Enable/Select Whisper IME from Mac
+
+```bash
+./scripts/dev-set-ime.sh
 ```
