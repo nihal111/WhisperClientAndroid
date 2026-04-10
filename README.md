@@ -4,6 +4,7 @@ Android client and keyboard (IME) for sending speech/text input to a self-hosted
 
 See the execution roadmap in [PLAN.md](./PLAN.md).
 See device setup options in [docs/DEVICE_SETUP.md](./docs/DEVICE_SETUP.md).
+See detailed wireless pairing/connect steps in [docs/WIRELESS_DEBUGGING_RUNBOOK.md](./docs/WIRELESS_DEBUGGING_RUNBOOK.md).
 See flow-bubble design notes in [docs/FLOW_BUBBLE.md](./docs/FLOW_BUBBLE.md).
 
 ## Current Status

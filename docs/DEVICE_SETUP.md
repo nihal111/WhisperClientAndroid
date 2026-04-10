@@ -1,6 +1,7 @@
 # Device Setup And Connectivity
 
 This document covers phone setup for `WhisperClient`, including no-USB workflows.
+For a full Mac+phone wireless pairing playbook, see [WIRELESS_DEBUGGING_RUNBOOK.md](./WIRELESS_DEBUGGING_RUNBOOK.md).
 
 ## Current Constraint (No USB + No Same Wi-Fi)
 
@@ -74,3 +75,5 @@ cd ~/Code/WhisperClient
 - If `adb devices` shows `unauthorized`: unlock phone and accept USB/Wireless debug prompt.
 - If `adb connect` times out: network path is blocked (VPN/client isolation/firewall).
 - If pairing succeeds but reconnect fails later: repeat `adb connect <IP:ADB_PORT>` from current phone network details.
+- If `adb pair` returns `connection refused`: pairing screen likely expired or port rotated; generate a fresh pairing code and port.
+- If `./gradlew installDebug` says "Unable to locate a Java Runtime": export `JAVA_HOME` to OpenJDK 17 in the shell.
