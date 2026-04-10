@@ -25,6 +25,6 @@ class ServerConfigStore(context: Context) {
         private const val PREFS_NAME = "whisper_client"
         private const val KEY_BASE_URL = "base_url"
         private const val KEY_ALLOW_INSECURE_HTTPS = "allow_insecure_https"
-        private const val DEFAULT_BASE_URL = "https://192.168.1.100:3000"
+        private const val DEFAULT_BASE_URL = "https://100.89.5.62:3000"
     }
 }
