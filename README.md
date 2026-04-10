@@ -57,6 +57,8 @@ If WhisperServer is running on your Mac, you can also smoke-check it:
 ./scripts/dev-server-smoke.sh https://127.0.0.1:3000
 ```
 
+The `/inference` empty-body probe may return `502` in proxy mode; this is expected for this smoke check.
+
 ### Wireless ADB
 
 ```bash
