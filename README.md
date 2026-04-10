@@ -1,143 +1,117 @@
-# WhisperClient
+# Whisper Client Android
 
-Android client for sending speech input to a self-hosted Wispr Server and inserting/copying responses via a Flow-style floating bubble.
+Minimal Android client for dictation against a self-hosted Wispr server.
 
-See the execution roadmap in [PLAN.md](./PLAN.md).
-See device setup options in [docs/DEVICE_SETUP.md](./docs/DEVICE_SETUP.md).
-See detailed wireless pairing/connect steps in [docs/WIRELESS_DEBUGGING_RUNBOOK.md](./docs/WIRELESS_DEBUGGING_RUNBOOK.md).
-See flow-bubble design notes in [docs/FLOW_BUBBLE.md](./docs/FLOW_BUBBLE.md).
+The app shows a floating dictation bubble when a text field is focused. You tap the bubble, speak, and the transcript is inserted into the active field (with clipboard fallback).
 
-## Current Status
+## What This App Does
 
-- M1-M3 complete: repo, Android scaffold, fast test-loop scripts.
-- App currently includes:
-  - launcher setup screen with server config and health check
-  - in-app audio recording and `/inference` transcription flow
-  - Flow-style floating bubble subsystem (decoupled from launcher screen)
-  - bubble flow: tap `Mic` -> recording waveform with `✓` (submit) and `✕` (cancel)
-  - focused-field insertion via accessibility, with clipboard fallback
+- Connects to a Wispr server running on your own computer (for example, a Mac).
+- Records microphone audio on-device and uploads it to `POST /inference`.
+- Shows an overlay bubble only when an editable text target is active.
+- Inserts transcription into the focused field through Accessibility APIs.
+- Falls back to clipboard copy/paste if direct insertion is unavailable.
 
-## Prerequisites
+## How The Self-Hosted Server Setup Works (Mac + Phone + Tailscale)
 
-1. JDK 17 installed (`brew install openjdk@17`).
-2. Android command-line tools installed (`brew install --cask android-commandlinetools`).
-3. Android SDK platform-tools installed (`sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools"`).
-4. Android device or emulator.
+This app is designed for a personal server workflow:
 
-The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
-`~/Library/Android/sdk/platform-tools/adb`, and auto-creates `local.properties`.
+1. You run the Wispr server on your computer (for example, Mac) and expose a port (commonly `3000`).
+2. Your Android phone is configured with that server base URL in the app.
+3. If phone and computer are not on the same local Wi-Fi, Tailscale can put both devices on the same tailnet.
+4. The phone then reaches the server over the Tailscale IP/hostname + port.
 
-## Quick Start
+Example base URL patterns:
 
-```bash
-./scripts/dev-e2e.sh mac
-```
+- `https://<mac-tailscale-ip>:3000`
+- `https://<mac-tailnet-name>.tailnet.ts.net:3000`
+- `http://<mac-tailscale-ip>:3000` (allowed by current network config)
 
-Then on phone/emulator:
-1. Open WhisperClient app.
-2. Set `Server base URL` (for your HTTPS web proxy this is `https://<mac-ip>:3000`).
-3. Keep `Allow insecure HTTPS` enabled for self-signed local certs.
-4. Tap `Start Recording`, speak, then tap `Stop + Transcribe`.
+Notes:
 
-## Experimental Flow Bubble
+- `Check Server` in the app performs a GET to `/`.
+- Dictation calls `POST /inference` with `multipart/form-data` and a WebM/Opus audio file.
+- For local/self-signed HTTPS, `Allow insecure HTTPS` enables trust-all TLS behavior in the client.
 
-The app includes an overlay subsystem that approximates a Wispr Flow-style bubble:
+## 10,000-Foot Architecture
 
-1. Open `Open Overlay Permission` and grant draw-over-apps permission.
-2. Open `Open Accessibility Settings` and enable `WhisperClient Focus Service`.
-3. Tap `Start Bubble Service`.
-4. Focus a text input field in another app; the bubble appears.
-5. Tap `Mic` to start recording (waveform appears).
-6. Tap `✓` to submit the captured audio or `✕` to cancel.
-7. If insertion is unavailable, text falls back to clipboard.
-8. Drag the bubble; it snaps to screen edge and remembers position.
+### 1. Launcher / Setup UI
 
-## Fast Loops
+`MainActivity` provides:
 
-### Mac-only
+- Server URL + insecure HTTPS toggle
+- Server health check
+- Manual record/transcribe test flow
+- Overlay + accessibility setup actions
+- Start/stop bubble service controls
 
-```bash
-./scripts/dev-e2e.sh mac
-```
+### 2. Floating Bubble Service
 
-This runs local compile + unit tests without a device.
+`WisprFloatingBubbleService`:
 
-### Emulator
+- Owns the overlay UI (`TYPE_APPLICATION_OVERLAY`)
+- Handles bubble states: idle, recording, transcribing
+- Records audio with `MediaRecorder` (WebM/Opus)
+- Sends audio to `WisprServerClient`
+- Inserts transcript via accessibility service instance, clipboard fallback otherwise
+- Supports drag, edge snap, and persisted bubble position
 
-```bash
-./scripts/dev-emulator-e2e.sh
-```
+### 3. Focus Detection + Text Insertion
 
-Defaults to `AVD_NAME=WhisperClient_API35`. Override with:
+`WisprFocusAccessibilityService`:
 
-```bash
-AVD_NAME=<your_avd_name> ./scripts/dev-emulator-e2e.sh
-```
+- Watches accessibility focus/content/window events
+- Determines whether an editable field is active
+- Applies visibility policy (hide on sensitive fields/packages)
+- Signals bubble service to show/hide
+- Performs text insertion in the currently focused input node
 
-### Connected Device
+### 4. Networking Layer
 
-```bash
-./scripts/dev-e2e.sh device
-```
+`WisprServerClient`:
 
-To run both local and device loops in sequence:
+- `healthCheck(baseUrl)` -> GET `/`
+- `transcribeAudio(baseUrl, audioFile)` -> POST `/inference`
+- Parses `{"text": "..."}` responses (with fallbacks)
 
-```bash
-./scripts/dev-e2e.sh full
-```
+### 5. Local State
 
-Optional log streaming during device/full mode:
+SharedPreferences-backed stores:
 
-```bash
-TAIL_LOGCAT=1 ./scripts/dev-e2e.sh device
-```
+- `ServerConfigStore`: base URL + insecure HTTPS flag
+- `TranscriptStore`: last transcript
+- `OverlayConfigStore`: bubble position + keyboard visibility override
 
-### Non-Empty Inference Test (Real WAV)
+## Permissions And Special Access
 
-Run a real transcription integration test through the Android client networking path:
+Manifest/runtime + special access used by the current app:
 
-```bash
-./scripts/dev-inference-test.sh https://127.0.0.1:3000 /absolute/path/to/sample.wav
-```
+- `INTERNET`: call Wispr server endpoints
+- `RECORD_AUDIO`: capture dictation audio
+- `SYSTEM_ALERT_WINDOW`: render floating bubble above other apps
+- `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MICROPHONE`: keep recording/transcribing service active
+- `POST_NOTIFICATIONS`: show foreground-service notification status (Android 13+)
+- Accessibility Service enablement (`BIND_ACCESSIBILITY_SERVICE`): detect focus + insert text
 
-Or via env vars:
+## How It Is Wired Together (End-to-End)
 
-```bash
-WISPR_SERVER_URL=https://127.0.0.1:3000 \
-WISPR_WAV_PATH=/absolute/path/to/sample.wav \
-./scripts/dev-inference-test.sh
-```
+1. User enables overlay + accessibility permissions and starts bubble service.
+2. Accessibility service detects editable focus in another app.
+3. Bubble service shows the floating mic bubble.
+4. User taps mic -> audio recording starts.
+5. User taps submit (`✓`) -> recording stops, audio sent to Wispr server `/inference`.
+6. Transcript is returned and saved.
+7. App inserts transcript into focused field; if insertion fails, it copies to clipboard.
+8. Bubble hides when focus is lost (unless currently recording).
 
-This executes `WisprServerClient.transcribeAudio(...)` in a JVM integration test and asserts a non-empty transcript.
+## Current Scope
 
-### Server Smoke Check
+This is intentionally a minimal client centered on the floating dictation bubble and self-hosted server connectivity.
 
-```bash
-./scripts/dev-server-smoke.sh https://127.0.0.1:3000
-```
+---
 
-The `/inference` empty-body probe may return `502` in proxy mode; this is expected for this smoke check.
+Additional internal docs:
 
-### Wireless ADB
-
-```bash
-./scripts/setup-wireless-adb.sh <PHONE_IP:PORT>
-```
-
-Example:
-
-```bash
-./scripts/setup-wireless-adb.sh 192.168.1.52:5555
-```
-
-### Install / Update
-
-```bash
-./scripts/dev-install.sh
-```
-
-### Logs
-
-```bash
-./scripts/dev-logcat.sh
-```
+- `docs/FLOW_BUBBLE.md`
+- `docs/DEVICE_SETUP.md`
+- `docs/WIRELESS_DEBUGGING_RUNBOOK.md`
