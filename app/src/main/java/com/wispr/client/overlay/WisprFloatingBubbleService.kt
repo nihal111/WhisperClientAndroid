@@ -162,6 +162,13 @@ class WisprFloatingBubbleService : Service() {
 
         container.addView(idle)
         container.addView(controls)
+        val dragTouchListener = DragTouchListener()
+        container.setOnTouchListener(dragTouchListener)
+        idle.setOnTouchListener(dragTouchListener)
+        controls.setOnTouchListener(dragTouchListener)
+        waveform.setOnTouchListener(dragTouchListener)
+        submit.setOnTouchListener(dragTouchListener)
+        cancel.setOnTouchListener(dragTouchListener)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -176,7 +183,6 @@ class WisprFloatingBubbleService : Service() {
             y = overlayConfigStore.getBubbleY() ?: defaultStartY()
         }
 
-        container.setOnTouchListener(DragTouchListener())
         windowManager.addView(container, params)
 
         bubbleView = container

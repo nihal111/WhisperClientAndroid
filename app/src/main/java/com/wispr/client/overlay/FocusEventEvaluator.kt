@@ -30,7 +30,7 @@ object FocusEventEvaluator {
                     packageName = eventPackage,
                 )
             }
-            val state = source.inspectSubtree()
+            val state = source.inspectTarget()
             FocusTargetState(
                 hasEditableTarget = state.hasEditable,
                 hasSensitiveTarget = state.hasSensitive,
@@ -58,7 +58,7 @@ object FocusEventEvaluator {
                     packageName = eventPackage,
                 )
             }
-            val state = root.inspectSubtree()
+            val state = root.inspectTarget()
             FocusTargetState(
                 hasEditableTarget = state.hasEditable,
                 hasSensitiveTarget = state.hasSensitive,
@@ -74,33 +74,26 @@ object FocusEventEvaluator {
         val hasSensitive: Boolean,
     )
 
-    private fun AccessibilityNodeInfo.inspectSubtree(): NodeScan {
-        var hasEditable = false
-        var hasSensitive = false
-
-        if (isProbablyEditable(this)) {
-            hasEditable = true
-            if (isSensitiveField(this)) {
-                hasSensitive = true
+    private fun AccessibilityNodeInfo.inspectTarget(): NodeScan {
+        val focused = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focused != null) {
+            try {
+                return inspectNode(focused)
+            } finally {
+                focused.recycle()
             }
         }
+        return inspectNode(this)
+    }
 
-        for (index in 0 until childCount) {
-            val child = getChild(index) ?: continue
-            try {
-                val childScan = child.inspectSubtree()
-                hasEditable = hasEditable || childScan.hasEditable
-                hasSensitive = hasSensitive || childScan.hasSensitive
-                if (hasEditable && hasSensitive) {
-                    break
-                }
-            } finally {
-                child.recycle()
-            }
+    private fun inspectNode(node: AccessibilityNodeInfo): NodeScan {
+        val editable = isProbablyEditable(node)
+        if (!editable) {
+            return NodeScan(hasEditable = false, hasSensitive = false)
         }
         return NodeScan(
-            hasEditable = hasEditable,
-            hasSensitive = hasSensitive,
+            hasEditable = true,
+            hasSensitive = isSensitiveField(node),
         )
     }
 

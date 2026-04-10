@@ -62,8 +62,8 @@ class BubbleVisibilityPolicyTest {
     }
 
     @Test
-    fun `keeps bubble when keyboard visible even if transient non-editable event arrives`() {
-        assertTrue(
+    fun `hides bubble when current focus is non-editable even if keyboard is visible`() {
+        assertFalse(
             BubbleVisibilityPolicy.shouldShow(
                 hasEditableTarget = false,
                 hasSensitiveTarget = false,
