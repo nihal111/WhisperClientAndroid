@@ -57,6 +57,7 @@ class WisprFloatingBubbleService : Service() {
     private var currentAudioFile: File? = null
     private var isRecording = false
     private var hasEditableFocus = false
+    private var isInForeground = false
 
     private var waveformJob = serviceScope.launch { }
 
@@ -67,7 +68,6 @@ class WisprFloatingBubbleService : Service() {
         overlayConfigStore = OverlayConfigStore(this)
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Idle"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -105,6 +105,7 @@ class WisprFloatingBubbleService : Service() {
         releaseRecorder(deleteTempAudio = true)
         stopWaveformAnimation()
         hideBubble()
+        exitForegroundIfNeeded()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -186,6 +187,7 @@ class WisprFloatingBubbleService : Service() {
         submitButton = submit
         cancelButton = cancel
 
+        container.post { applySnapToEdge() }
         setIdleMode()
     }
 
@@ -220,6 +222,7 @@ class WisprFloatingBubbleService : Service() {
             mediaRecorder = recorder
             currentAudioFile = outputFile
             isRecording = true
+            enterForegroundIfNeeded("Recording...")
             setRecordingMode()
             startWaveformAnimation()
             updateNotification("Recording...")
@@ -242,6 +245,7 @@ class WisprFloatingBubbleService : Service() {
         stopWaveformAnimation()
         setIdleMode()
         updateNotification("Recording cancelled")
+        exitForegroundIfNeeded()
 
         if (!hasEditableFocus) {
             hideBubble()
@@ -286,6 +290,7 @@ class WisprFloatingBubbleService : Service() {
                     }
                     setIdleMode()
                     updateNotification(if (didInsert) "Inserted transcript" else "Copied transcript")
+                    exitForegroundIfNeeded()
                     if (!hasEditableFocus) {
                         hideBubble()
                     }
@@ -294,6 +299,7 @@ class WisprFloatingBubbleService : Service() {
                     Log.e(TAG, "Overlay transcription failed", error)
                     setIdleMode()
                     updateNotification("Transcription failed")
+                    exitForegroundIfNeeded()
                     if (!hasEditableFocus) {
                         hideBubble()
                     }
@@ -392,8 +398,28 @@ class WisprFloatingBubbleService : Service() {
     }
 
     private fun updateNotification(status: String) {
+        if (!isInForeground) {
+            return
+        }
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, buildNotification(status))
+    }
+
+    private fun enterForegroundIfNeeded(status: String) {
+        if (isInForeground) {
+            updateNotification(status)
+            return
+        }
+        startForeground(NOTIFICATION_ID, buildNotification(status))
+        isInForeground = true
+    }
+
+    private fun exitForegroundIfNeeded() {
+        if (!isInForeground) {
+            return
+        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        isInForeground = false
     }
 
     private fun defaultStartX(): Int {
@@ -481,7 +507,12 @@ class WisprFloatingBubbleService : Service() {
 
         fun sendCommand(context: Context, action: String) {
             val intent = Intent(context, WisprFloatingBubbleService::class.java).setAction(action)
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                context.startService(intent)
+            } catch (error: IllegalStateException) {
+                Log.w(TAG, "startService failed for action=$action, falling back to foreground", error)
+                ContextCompat.startForegroundService(context, intent)
+            }
         }
     }
 }

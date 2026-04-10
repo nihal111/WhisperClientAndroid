@@ -41,6 +41,34 @@ object FocusEventEvaluator {
         }
     }
 
+    fun evaluateFromRoot(
+        root: AccessibilityNodeInfo?,
+        eventPackageName: String?,
+        appPackageName: String,
+    ): FocusTargetState? {
+        if (root == null) {
+            return null
+        }
+        return try {
+            val eventPackage = eventPackageName.orEmpty()
+            if (eventPackage == appPackageName) {
+                return FocusTargetState(
+                    hasEditableTarget = false,
+                    hasSensitiveTarget = false,
+                    packageName = eventPackage,
+                )
+            }
+            val state = root.inspectSubtree()
+            FocusTargetState(
+                hasEditableTarget = state.hasEditable,
+                hasSensitiveTarget = state.hasSensitive,
+                packageName = eventPackage,
+            )
+        } finally {
+            root.recycle()
+        }
+    }
+
     private data class NodeScan(
         val hasEditable: Boolean,
         val hasSensitive: Boolean,

@@ -14,6 +14,7 @@ import java.lang.ref.WeakReference
 
 class WisprFocusAccessibilityService : AccessibilityService() {
     private var lastEditableState: Boolean? = null
+    private var bubbleServicePrimed = false
     private lateinit var overlayConfigStore: OverlayConfigStore
     private val mainHandler = Handler(Looper.getMainLooper())
     private val delayedHide = Runnable { setBubbleVisible(false) }
@@ -22,11 +23,19 @@ class WisprFocusAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         overlayConfigStore = OverlayConfigStore(this)
         instanceRef = WeakReference(this)
+        WisprFloatingBubbleService.sendCommand(this, WisprFloatingBubbleService.ACTION_START)
+        bubbleServicePrimed = true
         Log.i(TAG, "Accessibility service connected")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        val focusState = FocusEventEvaluator.evaluate(event, packageName) ?: return
+        if (!bubbleServicePrimed) {
+            WisprFloatingBubbleService.sendCommand(this, WisprFloatingBubbleService.ACTION_START)
+            bubbleServicePrimed = true
+        }
+        val focusState = FocusEventEvaluator.evaluate(event, packageName)
+            ?: FocusEventEvaluator.evaluateFromRoot(rootInActiveWindow, event?.packageName?.toString(), packageName)
+            ?: return
         val shouldShow = BubbleVisibilityPolicy.shouldShow(
             hasEditableTarget = focusState.hasEditableTarget,
             hasSensitiveTarget = focusState.hasSensitiveTarget,
