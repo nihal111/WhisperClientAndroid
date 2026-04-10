@@ -21,6 +21,7 @@ See the execution roadmap in [PLAN.md](./PLAN.md).
 ## Quick Start
 
 ```bash
+./scripts/dev-doctor.sh
 ./scripts/dev-install.sh
 ./scripts/dev-logcat.sh
 ```
