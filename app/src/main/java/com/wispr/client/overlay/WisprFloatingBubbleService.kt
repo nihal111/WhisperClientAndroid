@@ -118,7 +118,7 @@ class WisprFloatingBubbleService : Service() {
             return
         }
 
-        val container = LinearLayout(this).apply {
+        val container = DragInterceptLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(12, 12, 12, 12)
@@ -163,13 +163,6 @@ class WisprFloatingBubbleService : Service() {
 
         container.addView(idle)
         container.addView(controls)
-        val dragTouchListener = DragTouchListener()
-        container.setOnTouchListener(dragTouchListener)
-        idle.setOnTouchListener(dragTouchListener)
-        controls.setOnTouchListener(dragTouchListener)
-        waveform.setOnTouchListener(dragTouchListener)
-        submit.setOnTouchListener(dragTouchListener)
-        cancel.setOnTouchListener(dragTouchListener)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -458,52 +451,55 @@ class WisprFloatingBubbleService : Service() {
         overlayConfigStore.setBubblePosition(snapped.x, snapped.y)
     }
 
-    private inner class DragTouchListener : View.OnTouchListener {
-        private val touchSlopPx = ViewConfiguration.get(this@WisprFloatingBubbleService).scaledTouchSlop * 2
+    private inner class DragInterceptLayout(context: Context) : LinearLayout(context) {
+        private val touchSlopPx = ViewConfiguration.get(context).scaledTouchSlop * 2
         private var startX = 0
         private var startY = 0
         private var initialTouchX = 0f
         private var initialTouchY = 0f
-        private var moved = false
+        private var isDragging = false
 
-        override fun onTouch(view: View, event: MotionEvent): Boolean {
-            val params = bubbleLayoutParams ?: return false
-            val windowView = bubbleView ?: return false
-            return when (event.actionMasked) {
+        override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+            when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    val params = bubbleLayoutParams ?: return false
                     startX = params.x
                     startY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    moved = false
-                    true
+                    initialTouchX = ev.rawX
+                    initialTouchY = ev.rawY
+                    isDragging = false
                 }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = (ev.rawX - initialTouchX).toInt()
+                    val deltaY = (ev.rawY - initialTouchY).toInt()
+                    if (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx) {
+                        isDragging = true
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            val params = bubbleLayoutParams ?: return false
+            val windowView = bubbleView ?: return false
+            when (event.actionMasked) {
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = (event.rawX - initialTouchX).toInt()
                     val deltaY = (event.rawY - initialTouchY).toInt()
-                    if (!moved && (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx)) {
-                        moved = true
-                    }
-                    if (!moved) {
-                        return true
-                    }
                     params.x = startX + deltaX
                     params.y = startY + deltaY
                     runCatching { windowManager.updateViewLayout(windowView, params) }
-                    true
                 }
-                MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_CANCEL -> {
-                    if (moved) {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (isDragging) {
                         applySnapToEdge()
-                        true
-                    } else {
-                        view.performClick()
-                        true
                     }
+                    isDragging = false
                 }
-                else -> false
             }
+            return true
         }
     }
 
