@@ -33,9 +33,29 @@ class WisprFocusAccessibilityService : AccessibilityService() {
             WisprFloatingBubbleService.sendCommand(this, WisprFloatingBubbleService.ACTION_START)
             bubbleServicePrimed = true
         }
-        val focusState = FocusEventEvaluator.evaluate(event, packageName)
-            ?: FocusEventEvaluator.evaluateFromRoot(rootInActiveWindow, event?.packageName?.toString(), packageName)
-            ?: return
+        var focusState = FocusEventEvaluator.evaluate(event, packageName)
+
+        // When the event source says no editable target, cross-check against
+        // the full window root. Content-change events often fire from
+        // non-editable nodes (toolbar, labels) even while an editable field
+        // retains input focus.
+        if (focusState != null && !focusState.hasEditableTarget) {
+            val rootState = FocusEventEvaluator.evaluateFromRoot(
+                rootInActiveWindow, event?.packageName?.toString(), packageName,
+            )
+            if (rootState != null && rootState.hasEditableTarget) {
+                focusState = rootState
+            }
+        }
+
+        if (focusState == null) {
+            focusState = FocusEventEvaluator.evaluateFromRoot(
+                rootInActiveWindow, event?.packageName?.toString(), packageName,
+            )
+        }
+
+        if (focusState == null) return
+
         val shouldShow = BubbleVisibilityPolicy.shouldShow(
             hasEditableTarget = focusState.hasEditableTarget,
             hasSensitiveTarget = focusState.hasSensitiveTarget,
@@ -48,6 +68,16 @@ class WisprFocusAccessibilityService : AccessibilityService() {
             mainHandler.removeCallbacks(delayedHide)
             setBubbleVisible(true)
         } else if (lastEditableState == true) {
+            // Only focus and window-state events are reliable hide signals.
+            // TYPE_WINDOW_CONTENT_CHANGED and TYPE_VIEW_CLICKED fire
+            // constantly (every keystroke, every UI update) and cause
+            // false hides while the text field still has focus.
+            val eventType = event?.eventType ?: return
+            if (eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED &&
+                eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            ) {
+                return
+            }
             mainHandler.removeCallbacks(delayedHide)
             mainHandler.postDelayed(delayedHide, HIDE_DEBOUNCE_MS)
         } else {
