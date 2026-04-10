@@ -157,19 +157,29 @@ class WisprServerClient {
     }
 
     internal fun parseTranscriptionText(rawResponse: String): String {
-        val regexMatch = TEXT_JSON_REGEX.find(rawResponse)
-        if (regexMatch != null) {
-            return regexMatch.groupValues[1]
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\")
-                .trim()
+        val raw = run {
+            val regexMatch = TEXT_JSON_REGEX.find(rawResponse)
+            if (regexMatch != null) {
+                return@run regexMatch.groupValues[1]
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\")
+                    .trim()
+            }
+            try {
+                JSONObject(rawResponse).optString("text").trim()
+            } catch (_: Throwable) {
+                rawResponse.trim()
+            }
         }
+        return cleanTranscriptionText(raw)
+    }
 
-        return try {
-            JSONObject(rawResponse).optString("text").trim()
-        } catch (_: Throwable) {
-            rawResponse.trim()
-        }
+    internal fun cleanTranscriptionText(text: String): String {
+        return text
+            .replace("\\n", " ")
+            .replace("\n", " ")
+            .replace(Regex(" {2,}"), " ")
+            .trim()
     }
 
     private companion object {
