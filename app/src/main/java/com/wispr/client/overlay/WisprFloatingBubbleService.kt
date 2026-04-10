@@ -1,5 +1,6 @@
 package com.wispr.client.overlay
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,6 +9,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
@@ -18,6 +20,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.wispr.client.R
@@ -28,6 +31,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -42,13 +47,18 @@ class WisprFloatingBubbleService : Service() {
     private lateinit var windowManager: WindowManager
     private var bubbleView: LinearLayout? = null
     private var bubbleLayoutParams: WindowManager.LayoutParams? = null
-    private var recordButton: Button? = null
-    private var copyButton: Button? = null
+    private var idleButton: Button? = null
+    private var recordingPanel: LinearLayout? = null
+    private var waveformText: TextView? = null
+    private var submitButton: Button? = null
+    private var cancelButton: Button? = null
 
     private var mediaRecorder: MediaRecorder? = null
     private var currentAudioFile: File? = null
     private var isRecording = false
     private var hasEditableFocus = false
+
+    private var waveformJob = serviceScope.launch { }
 
     override fun onCreate() {
         super.onCreate()
@@ -83,14 +93,17 @@ class WisprFloatingBubbleService : Service() {
             }
             ACTION_FOCUS_NON_EDITABLE -> {
                 hasEditableFocus = false
-                hideBubble()
+                if (!isRecording) {
+                    hideBubble()
+                }
             }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        releaseRecorder()
+        releaseRecorder(deleteTempAudio = true)
+        stopWaveformAnimation()
         hideBubble()
         serviceScope.cancel()
         super.onDestroy()
@@ -102,29 +115,53 @@ class WisprFloatingBubbleService : Service() {
         if (bubbleView != null) {
             return
         }
+
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(12, 12, 12, 12)
             setBackgroundColor(0xCC1E1E1E.toInt())
         }
-        val record = Button(this).apply {
-            text = "Record"
-            setOnClickListener {
-                if (!isRecording) {
-                    startRecording()
-                } else {
-                    stopAndTranscribe()
-                }
-            }
+
+        val idle = Button(this).apply {
+            text = "Mic"
+            isAllCaps = false
+            setOnClickListener { startRecording() }
         }
-        val copy = Button(this).apply {
-            text = "Copy"
-            setOnClickListener {
-                copyLastTranscript()
-            }
+
+        val waveform = TextView(this).apply {
+            text = WAVE_FRAMES.first()
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 18f
+            setPadding(12, 0, 12, 0)
         }
-        container.addView(record)
-        container.addView(copy)
+
+        val submit = Button(this).apply {
+            text = "✓"
+            isAllCaps = false
+            textSize = 20f
+            setOnClickListener { stopAndSubmitRecording() }
+        }
+
+        val cancel = Button(this).apply {
+            text = "✕"
+            isAllCaps = false
+            textSize = 20f
+            setOnClickListener { cancelRecording() }
+        }
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            addView(waveform)
+            addView(submit)
+            addView(cancel)
+        }
+
+        container.addView(idle)
+        container.addView(controls)
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -137,12 +174,19 @@ class WisprFloatingBubbleService : Service() {
             x = overlayConfigStore.getBubbleX() ?: defaultStartX()
             y = overlayConfigStore.getBubbleY() ?: defaultStartY()
         }
+
         container.setOnTouchListener(DragTouchListener())
         windowManager.addView(container, params)
+
         bubbleView = container
         bubbleLayoutParams = params
-        recordButton = record
-        copyButton = copy
+        idleButton = idle
+        recordingPanel = controls
+        waveformText = waveform
+        submitButton = submit
+        cancelButton = cancel
+
+        setIdleMode()
     }
 
     private fun hideBubble() {
@@ -150,11 +194,19 @@ class WisprFloatingBubbleService : Service() {
         runCatching { windowManager.removeView(view) }
         bubbleView = null
         bubbleLayoutParams = null
-        recordButton = null
-        copyButton = null
+        idleButton = null
+        recordingPanel = null
+        waveformText = null
+        submitButton = null
+        cancelButton = null
     }
 
     private fun startRecording() {
+        if (!hasRecordAudioPermission()) {
+            updateNotification("Mic permission required")
+            return
+        }
+
         try {
             val outputFile = File(cacheDir, "bubble-recording-${System.currentTimeMillis()}.webm")
             val recorder = MediaRecorder()
@@ -164,29 +216,55 @@ class WisprFloatingBubbleService : Service() {
             recorder.setOutputFile(outputFile.absolutePath)
             recorder.prepare()
             recorder.start()
+
             mediaRecorder = recorder
             currentAudioFile = outputFile
             isRecording = true
-            recordButton?.text = "Stop"
+            setRecordingMode()
+            startWaveformAnimation()
             updateNotification("Recording...")
         } catch (error: Exception) {
             Log.e(TAG, "Failed to start overlay recording", error)
-            releaseRecorder()
+            releaseRecorder(deleteTempAudio = true)
+            setIdleMode()
             updateNotification("Record failed")
         }
     }
 
-    private fun stopAndTranscribe() {
+    private fun cancelRecording() {
+        if (!isRecording) {
+            setIdleMode()
+            return
+        }
+
+        runCatching { mediaRecorder?.stop() }
+        releaseRecorder(deleteTempAudio = true)
+        stopWaveformAnimation()
+        setIdleMode()
+        updateNotification("Recording cancelled")
+
+        if (!hasEditableFocus) {
+            hideBubble()
+        }
+    }
+
+    private fun stopAndSubmitRecording() {
         val recorder = mediaRecorder
         val audioFile = currentAudioFile
         if (recorder == null || audioFile == null) {
-            releaseRecorder()
+            releaseRecorder(deleteTempAudio = true)
+            setIdleMode()
             return
         }
+
         runCatching { recorder.stop() }
-        releaseRecorder()
-        recordButton?.text = "..."
+        runCatching { recorder.release() }
+        mediaRecorder = null
+        isRecording = false
+        stopWaveformAnimation()
+        setTranscribingMode()
         updateNotification("Transcribing...")
+
         val baseUrl = serverConfigStore.getBaseUrl()
         val allowInsecureHttps = serverConfigStore.getAllowInsecureHttps()
 
@@ -195,6 +273,8 @@ class WisprFloatingBubbleService : Service() {
             if (!audioFile.delete()) {
                 Log.w(TAG, "Failed deleting temp file: ${audioFile.absolutePath}")
             }
+            currentAudioFile = null
+
             result.fold(
                 onSuccess = { text ->
                     transcriptStore.setLastTranscript(text)
@@ -204,25 +284,61 @@ class WisprFloatingBubbleService : Service() {
                     if (!didInsert) {
                         copyToClipboard(text)
                     }
-                    recordButton?.text = "Record"
+                    setIdleMode()
                     updateNotification(if (didInsert) "Inserted transcript" else "Copied transcript")
+                    if (!hasEditableFocus) {
+                        hideBubble()
+                    }
                 },
                 onFailure = { error ->
-                    recordButton?.text = "Record"
                     Log.e(TAG, "Overlay transcription failed", error)
+                    setIdleMode()
                     updateNotification("Transcription failed")
+                    if (!hasEditableFocus) {
+                        hideBubble()
+                    }
                 },
             )
         }
     }
 
-    private fun copyLastTranscript() {
-        val text = transcriptStore.getLastTranscript()
-        if (text.isBlank()) {
-            return
+    private fun setIdleMode() {
+        idleButton?.visibility = View.VISIBLE
+        recordingPanel?.visibility = View.GONE
+        submitButton?.isEnabled = true
+        cancelButton?.isEnabled = true
+        waveformText?.text = WAVE_FRAMES.first()
+    }
+
+    private fun setRecordingMode() {
+        idleButton?.visibility = View.GONE
+        recordingPanel?.visibility = View.VISIBLE
+        submitButton?.isEnabled = true
+        cancelButton?.isEnabled = true
+    }
+
+    private fun setTranscribingMode() {
+        idleButton?.visibility = View.GONE
+        recordingPanel?.visibility = View.VISIBLE
+        submitButton?.isEnabled = false
+        cancelButton?.isEnabled = false
+        waveformText?.text = "…"
+    }
+
+    private fun startWaveformAnimation() {
+        stopWaveformAnimation()
+        waveformJob = serviceScope.launch {
+            var frame = 0
+            while (isActive && isRecording) {
+                waveformText?.text = WAVE_FRAMES[frame % WAVE_FRAMES.size]
+                frame += 1
+                delay(120)
+            }
         }
-        copyToClipboard(text)
-        updateNotification("Copied transcript")
+    }
+
+    private fun stopWaveformAnimation() {
+        waveformJob.cancel()
     }
 
     private fun copyToClipboard(text: String) {
@@ -230,12 +346,26 @@ class WisprFloatingBubbleService : Service() {
         clipboard.setPrimaryClip(ClipData.newPlainText("WhisperClient", text))
     }
 
-    private fun releaseRecorder() {
-        mediaRecorder?.release()
+    private fun releaseRecorder(deleteTempAudio: Boolean) {
+        mediaRecorder?.let { recorder ->
+            runCatching { recorder.release() }
+        }
         mediaRecorder = null
-        currentAudioFile = null
         isRecording = false
-        recordButton?.text = "Record"
+
+        if (deleteTempAudio) {
+            currentAudioFile?.let { tempFile ->
+                if (tempFile.exists() && !tempFile.delete()) {
+                    Log.w(TAG, "Failed deleting temp file: ${tempFile.absolutePath}")
+                }
+            }
+            currentAudioFile = null
+        }
+    }
+
+    private fun hasRecordAudioPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
     }
 
     private fun createNotificationChannel() {
@@ -347,6 +477,7 @@ class WisprFloatingBubbleService : Service() {
         private const val TAG = "WisprOverlaySvc"
         private const val CHANNEL_ID = "wispr_overlay_channel"
         private const val NOTIFICATION_ID = 2001
+        private val WAVE_FRAMES = listOf("▁▂▃▅▇▅▃▂", "▂▃▅▇▅▃▂▁", "▃▅▇▅▃▂▁▂", "▅▇▅▃▂▁▂▃")
 
         fun sendCommand(context: Context, action: String) {
             val intent = Intent(context, WisprFloatingBubbleService::class.java).setAction(action)

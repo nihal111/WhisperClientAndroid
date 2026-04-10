@@ -1,6 +1,8 @@
 package com.wispr.client.overlay
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -95,14 +97,42 @@ class WisprFocusAccessibilityService : AccessibilityService() {
         node: AccessibilityNodeInfo,
         text: String,
     ): Boolean {
-        val args = Bundle().apply {
-            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+        val normalized = text.trim()
+        if (normalized.isBlank()) {
+            return false
         }
-        val didSet = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+
+        val existing = node.text?.toString().orEmpty()
+        val selectionStart = node.textSelectionStart
+        val selectionEnd = node.textSelectionEnd
+
+        val didSet = if (existing.isNotEmpty() && selectionStart >= 0 && selectionEnd >= 0) {
+            val safeStart = minOf(selectionStart, selectionEnd).coerceIn(0, existing.length)
+            val safeEnd = maxOf(selectionStart, selectionEnd).coerceIn(0, existing.length)
+            val mergedText = buildString {
+                append(existing.substring(0, safeStart))
+                append(normalized)
+                append(existing.substring(safeEnd))
+            }
+            performSetText(node, mergedText)
+        } else {
+            performSetText(node, normalized)
+        }
+
         if (didSet) {
             return true
         }
+
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("WhisperClient", normalized))
         return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    }
+
+    private fun performSetText(node: AccessibilityNodeInfo, value: String): Boolean {
+        val args = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+        }
+        return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
     }
 
     private fun isInputMethodWindowVisible(): Boolean {

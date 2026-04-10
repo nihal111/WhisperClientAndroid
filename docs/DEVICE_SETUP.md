@@ -57,7 +57,7 @@ adb devices
 
 You should see your device state as `device`.
 
-## Install, Launch, And Select IME
+## Install, Launch, And Start Flow Bubble
 
 Once connected (USB or wireless):
 
@@ -66,9 +66,15 @@ cd ~/Code/WhisperClient
 ./scripts/dev-doctor.sh
 ./scripts/dev-install.sh
 ./scripts/dev-launch-app.sh
-./scripts/dev-set-ime.sh
 ./scripts/dev-logcat.sh
 ```
+
+In the app:
+1. Set server base URL and save.
+2. Grant overlay permission.
+3. Enable accessibility service (`WhisperClient Focus Service`).
+4. Start bubble service.
+5. Focus any text field in another app, tap `Mic`, then use `✓` (submit) or `✕` (cancel).
 
 ## Troubleshooting
 

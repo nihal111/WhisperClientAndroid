@@ -6,7 +6,7 @@ class OverlayConfigStore(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun getShowBubbleWithoutKeyboard(): Boolean {
-        return prefs.getBoolean(KEY_SHOW_WITHOUT_KEYBOARD, false)
+        return prefs.getBoolean(KEY_SHOW_WITHOUT_KEYBOARD, true)
     }
 
     fun setShowBubbleWithoutKeyboard(value: Boolean) {

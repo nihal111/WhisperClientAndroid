@@ -9,7 +9,7 @@ Show a floating transcription bubble when a text input gains focus in any app, t
 2. send audio to Wispr Server (`/inference`),
 3. insert text into focused field (or copy to clipboard fallback).
 
-This is intentionally decoupled from the existing launcher screen recording flow and IME flow.
+This is intentionally decoupled from the existing launcher screen recording flow.
 
 ## Permissions And Access Requirements
 
@@ -39,7 +39,10 @@ This is intentionally decoupled from the existing launcher screen recording flow
 2. `WisprFloatingBubbleService`
 - Foreground service hosting `TYPE_APPLICATION_OVERLAY` floating UI.
 - Drag-and-snap bubble position with persisted coordinates.
-- Record/stop buttons for quick dictation.
+- Idle state with single `Mic` action.
+- Recording state with animated waveform plus:
+  - `✓` submit (stop + transcribe)
+  - `✕` cancel (discard audio)
 - Calls `WisprServerClient.transcribeAudio(...)`.
 - Inserts via accessibility service or clipboard fallback.
 

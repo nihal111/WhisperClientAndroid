@@ -61,9 +61,6 @@ class MainActivity : ComponentActivity() {
                         transcriptStore = transcriptStore,
                         overlayConfigStore = overlayConfigStore,
                         serverClient = serverClient,
-                        onOpenImeSettings = {
-                            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-                        },
                         onOpenOverlaySettings = {
                             val intent = Intent(
                                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -99,7 +96,6 @@ private fun SetupScreen(
     transcriptStore: TranscriptStore,
     overlayConfigStore: OverlayConfigStore,
     serverClient: WisprServerClient,
-    onOpenImeSettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onStartBubbleService: () -> Unit,
@@ -299,21 +295,12 @@ private fun SetupScreen(
                 .padding(top = 10.dp),
         )
 
-        Button(
-            onClick = onOpenImeSettings,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp),
-        ) {
-            Text("Open Keyboard Settings")
-        }
-
         Text(
             text = "Flow Bubble (Overlay + Accessibility)",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp),
+                .padding(top = 20.dp),
         )
 
         Text(
