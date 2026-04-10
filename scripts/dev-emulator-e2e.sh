@@ -42,8 +42,12 @@ echo "[emulator-e2e] Granting microphone permission"
 
 echo "[emulator-e2e] Launching app and selecting IME"
 "$ADB_BIN" shell am start -n "$APP_ID_DEBUG/com.wispr.client.MainActivity"
-"$ADB_BIN" shell ime enable "$IME_ID"
-"$ADB_BIN" shell ime set "$IME_ID"
+if ! "$ADB_BIN" shell ime enable "$IME_ID"; then
+  echo "[emulator-e2e] Warning: could not enable IME ($IME_ID)"
+fi
+if ! "$ADB_BIN" shell ime set "$IME_ID"; then
+  echo "[emulator-e2e] Warning: could not set IME ($IME_ID)"
+fi
 
 echo "[emulator-e2e] Running instrumented tests"
 ./gradlew :app:connectedDebugAndroidTest

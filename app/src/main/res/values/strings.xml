@@ -2,4 +2,8 @@
     <string name="app_name">WhisperClient</string>
     <string name="ime_name">Whisper Keyboard</string>
     <string name="server_base_url_label">Server base URL</string>
+    <string name="accessibility_service_name">WhisperClient Focus Service</string>
+    <string name="accessibility_service_description">Detects focused editable fields and enables bubble text insertion.</string>
+    <string name="overlay_channel_name">Whisper Bubble</string>
+    <string name="overlay_notification_title">Whisper Bubble Active</string>
 </resources>

@@ -2,6 +2,7 @@ package com.wispr.client
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.provider.Settings
@@ -33,6 +34,10 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.wispr.client.overlay.AccessibilityPermission
+import com.wispr.client.overlay.OverlayPermission
+import com.wispr.client.overlay.WisprFloatingBubbleService
+import com.wispr.client.overlay.WisprFocusAccessibilityService
 import com.wispr.client.data.ServerConfigStore
 import com.wispr.client.data.TranscriptStore
 import com.wispr.client.network.WisprServerClient
@@ -56,6 +61,28 @@ class MainActivity : ComponentActivity() {
                         onOpenImeSettings = {
                             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                         },
+                        onOpenOverlaySettings = {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:$packageName"),
+                            )
+                            startActivity(intent)
+                        },
+                        onOpenAccessibilitySettings = {
+                            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        },
+                        onStartBubbleService = {
+                            WisprFloatingBubbleService.sendCommand(
+                                this,
+                                WisprFloatingBubbleService.ACTION_START,
+                            )
+                        },
+                        onStopBubbleService = {
+                            WisprFloatingBubbleService.sendCommand(
+                                this,
+                                WisprFloatingBubbleService.ACTION_STOP,
+                            )
+                        },
                     )
                 }
             }
@@ -69,6 +96,10 @@ private fun SetupScreen(
     transcriptStore: TranscriptStore,
     serverClient: WisprServerClient,
     onOpenImeSettings: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onStartBubbleService: () -> Unit,
+    onStopBubbleService: () -> Unit,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -79,6 +110,8 @@ private fun SetupScreen(
     var statusText by remember { mutableStateOf("Idle") }
     var transcript by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
+    var canDrawOverlay by remember { mutableStateOf(false) }
+    var accessibilityEnabled by remember { mutableStateOf(false) }
 
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var currentAudioFile by remember { mutableStateOf<File?>(null) }
@@ -114,6 +147,11 @@ private fun SetupScreen(
         baseUrl = serverConfigStore.getBaseUrl()
         allowInsecureHttps = serverConfigStore.getAllowInsecureHttps()
         transcript = transcriptStore.getLastTranscript()
+        canDrawOverlay = OverlayPermission.canDraw(context)
+        accessibilityEnabled = AccessibilityPermission.isServiceEnabled(
+            context,
+            WisprFocusAccessibilityService::class.java,
+        )
     }
 
     Column(
@@ -262,6 +300,72 @@ private fun SetupScreen(
                 .padding(top = 20.dp),
         ) {
             Text("Open Keyboard Settings")
+        }
+
+        Text(
+            text = "Flow Bubble (Overlay + Accessibility)",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp),
+        )
+
+        Text(
+            text = "Overlay: ${if (canDrawOverlay) "granted" else "not granted"} | Accessibility: ${if (accessibilityEnabled) "enabled" else "disabled"}",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        )
+
+        Button(
+            onClick = onOpenOverlaySettings,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Open Overlay Permission")
+        }
+
+        Button(
+            onClick = onOpenAccessibilitySettings,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Open Accessibility Settings")
+        }
+
+        Button(
+            onClick = {
+                canDrawOverlay = OverlayPermission.canDraw(context)
+                accessibilityEnabled = AccessibilityPermission.isServiceEnabled(
+                    context,
+                    WisprFocusAccessibilityService::class.java,
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Refresh Bubble Status")
+        }
+
+        Button(
+            onClick = onStartBubbleService,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Start Bubble Service")
+        }
+
+        Button(
+            onClick = onStopBubbleService,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Stop Bubble Service")
         }
     }
 }

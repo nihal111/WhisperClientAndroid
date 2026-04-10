@@ -4,6 +4,7 @@ Android client and keyboard (IME) for sending speech/text input to a self-hosted
 
 See the execution roadmap in [PLAN.md](./PLAN.md).
 See device setup options in [docs/DEVICE_SETUP.md](./docs/DEVICE_SETUP.md).
+See flow-bubble design notes in [docs/FLOW_BUBBLE.md](./docs/FLOW_BUBBLE.md).
 
 ## Current Status
 
@@ -13,6 +14,7 @@ See device setup options in [docs/DEVICE_SETUP.md](./docs/DEVICE_SETUP.md).
   - in-app audio recording and `/inference` transcription flow
   - IME service with direct record/transcribe plus `Insert` and `Copy` actions
   - clipboard fallback when direct insertion is unavailable
+  - experimental Flow-style floating bubble subsystem (decoupled from main screen/IME path)
 
 ## Prerequisites
 
@@ -38,6 +40,17 @@ Then on phone/emulator:
 5. Tap `Open Keyboard Settings`, enable `Whisper Keyboard`, and select it.
 6. Open any text field and use keyboard `Record` (then `Stop`) to transcribe directly into the focused field.
 7. Use keyboard `Insert` or `Copy` to reuse the last transcript.
+
+## Experimental Flow Bubble
+
+The app now includes a separate `overlay` subsystem that approximates a Wispr Flow-style bubble:
+
+1. Open `Open Overlay Permission` and grant draw-over-apps permission.
+2. Open `Open Accessibility Settings` and enable `WhisperClient Focus Service`.
+3. Tap `Start Bubble Service`.
+4. Focus a text input field in another app; the bubble appears.
+5. Tap `Record` then `Stop` to transcribe and insert text.
+6. If insertion is unavailable, text falls back to clipboard.
 
 ## Fast Loops
 
