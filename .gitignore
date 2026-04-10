@@ -11,3 +11,5 @@ captures/
 keystore.properties
 *.apk
 *.aab
+*.wav
+*.waf
