@@ -339,6 +339,13 @@ class WisprFloatingBubbleService : Service() {
         submitButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
         cancelButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
         waveformText?.text = WAVE_FRAMES.first()
+        // Restore the saved position before snapping so the bubble returns
+        // to the edge the user originally placed it on, not the shifted
+        // position from the wider recording pill.
+        bubbleLayoutParams?.let { params ->
+            overlayConfigStore.getBubbleX()?.let { params.x = it }
+            overlayConfigStore.getBubbleY()?.let { params.y = it }
+        }
         bubbleView?.post { applySnapToEdge() }
     }
 
