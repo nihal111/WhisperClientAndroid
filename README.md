@@ -8,8 +8,9 @@ See the execution roadmap in [PLAN.md](./PLAN.md).
 
 - M1 in progress: repo, Android scaffold, IME skeleton, fast test-loop scripts.
 - App currently includes:
-  - launcher setup screen with quick jump to keyboard settings
-  - IME service with `Insert` and `Copy` sample actions
+  - launcher setup screen with server config and health check
+  - in-app audio recording and `/inference` transcription flow
+  - IME service with `Insert` and `Copy` actions for the last transcript
 
 ## Prerequisites
 
@@ -31,9 +32,11 @@ The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
 
 Then on phone:
 1. Open WhisperClient app.
-2. Tap `Open Keyboard Settings`.
-3. Enable `Whisper Keyboard` and select it.
-4. Open any text field and test `Insert`/`Copy` buttons.
+2. Set `Server base URL` (for your HTTPS web proxy this is `https://<mac-ip>:3000`).
+3. Keep `Allow insecure HTTPS` enabled for self-signed local certs.
+4. Tap `Start Recording`, speak, then tap `Stop + Transcribe`.
+5. Tap `Open Keyboard Settings`, enable `Whisper Keyboard`, and select it.
+6. Open any text field and use keyboard `Insert` / `Copy`.
 
 ## Fast Device Loop
 

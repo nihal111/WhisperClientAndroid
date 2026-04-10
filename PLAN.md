@@ -16,7 +16,7 @@ Build an Android app with a fast local test loop that behaves like Wispr Flow, b
 
 ## Milestones
 
-### M1. Repo + Fast Dev Loop (current)
+### M1. Repo + Fast Dev Loop (done)
 
 - Create standalone repo (`~/Code/WhisperClient`).
 - Scaffold Android app and baseline modules.
@@ -29,7 +29,7 @@ Build an Android app with a fast local test loop that behaves like Wispr Flow, b
   - One-command debug install/update loop on connected phone.
   - Team can run local app and view logs quickly.
 
-### M2. Networking Contract + Health Check
+### M2. Networking Contract + Health Check (in progress)
 
 - Define explicit request/response JSON schema with Wispr Server.
 - Implement API client + timeout/retry policy.
@@ -61,6 +61,17 @@ Build an Android app with a fast local test loop that behaves like Wispr Flow, b
 - Support upload/stream mode consistent with server API.
 - Exit criteria:
   - Speak -> server transcription -> insert/copy flow end-to-end.
+
+### Current implemented subset
+
+- Android debug tooling scripts are in place (`dev-doctor`, `dev-install`, `dev-logcat`, `setup-wireless-adb`).
+- Local environment bootstrap script auto-configures `JAVA_HOME`, SDK path, and `local.properties`.
+- Launcher screen supports:
+  - server base URL save
+  - server reachability check
+  - microphone recording and upload to `/inference`
+  - transcript display and copy
+- IME reads and inserts/copies the most recent transcript.
 
 ### M6. Debug UX for Iteration
 

@@ -1,10 +1,14 @@
 package com.wispr.client
 
+import android.Manifest
 import android.content.Intent
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,23 +18,32 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.wispr.client.data.ServerConfigStore
+import com.wispr.client.data.TranscriptStore
 import com.wispr.client.network.WisprServerClient
+import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val serverConfigStore = ServerConfigStore(this)
+        val transcriptStore = TranscriptStore(this)
         val serverClient = WisprServerClient()
 
         setContent {
@@ -38,6 +51,7 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     SetupScreen(
                         serverConfigStore = serverConfigStore,
+                        transcriptStore = transcriptStore,
                         serverClient = serverClient,
                         onOpenImeSettings = {
                             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
@@ -52,21 +66,61 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun SetupScreen(
     serverConfigStore: ServerConfigStore,
+    transcriptStore: TranscriptStore,
     serverClient: WisprServerClient,
     onOpenImeSettings: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+
     var baseUrl by remember { mutableStateOf("") }
+    var allowInsecureHttps by remember { mutableStateOf(true) }
     var statusText by remember { mutableStateOf("Idle") }
+    var transcript by remember { mutableStateOf("") }
+    var isRecording by remember { mutableStateOf(false) }
+
+    var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var currentAudioFile by remember { mutableStateOf<File?>(null) }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) {
+            statusText = "Microphone permission denied"
+            return@rememberLauncherForActivityResult
+        }
+
+        try {
+            val outputFile = File(context.cacheDir, "recording-${System.currentTimeMillis()}.webm")
+            val recorder = MediaRecorder()
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.WEBM)
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
+            recorder.setOutputFile(outputFile.absolutePath)
+            recorder.prepare()
+            recorder.start()
+
+            mediaRecorder = recorder
+            currentAudioFile = outputFile
+            isRecording = true
+            statusText = "Recording... tap Stop to transcribe"
+        } catch (e: Exception) {
+            statusText = "Recording failed: ${e.message ?: "unknown error"}"
+        }
+    }
 
     LaunchedEffect(Unit) {
         baseUrl = serverConfigStore.getBaseUrl()
+        allowInsecureHttps = serverConfigStore.getAllowInsecureHttps()
+        transcript = transcriptStore.getLastTranscript()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(text = "WhisperClient", style = MaterialTheme.typography.headlineMedium)
@@ -81,45 +135,124 @@ private fun SetupScreen(
             singleLine = true,
         )
 
-        Button(
-            onClick = {
-                serverConfigStore.setBaseUrl(baseUrl)
-                statusText = "Saved URL"
+        RowLine(
+            label = "Allow insecure HTTPS (self-signed cert)",
+            control = {
+                Switch(
+                    checked = allowInsecureHttps,
+                    onCheckedChange = { allowInsecureHttps = it },
+                )
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-        ) {
-            Text("Save URL")
-        }
+        )
 
         Button(
             onClick = {
-                statusText = "Checking /health..."
+                serverConfigStore.setBaseUrl(baseUrl)
+                serverConfigStore.setAllowInsecureHttps(allowInsecureHttps)
+                statusText = "Saved config"
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
         ) {
-            Text("Check Health")
+            Text("Save Config")
         }
 
-        LaunchedEffect(statusText) {
-            if (statusText != "Checking /health...") {
-                return@LaunchedEffect
-            }
-            val result = serverClient.healthCheck(baseUrl)
-            statusText = result.fold(
-                onSuccess = { "Health OK (HTTP $it)" },
-                onFailure = { "Health failed: ${it.message ?: "unknown error"}" },
-            )
+        Button(
+            onClick = {
+                scope.launch {
+                    statusText = "Checking server..."
+                    val result = serverClient.healthCheck(baseUrl, allowInsecureHttps)
+                    statusText = result.fold(
+                        onSuccess = { "Server reachable (HTTP $it)" },
+                        onFailure = { "Server check failed: ${it.message ?: "unknown error"}" },
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Check Server")
         }
+
+        Button(
+            onClick = {
+                if (!isRecording) {
+                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    return@Button
+                }
+
+                val recorder = mediaRecorder
+                val audioFile = currentAudioFile
+                if (recorder == null || audioFile == null) {
+                    statusText = "No active recording"
+                    isRecording = false
+                    return@Button
+                }
+
+                try {
+                    recorder.stop()
+                } catch (_: Exception) {
+                }
+                recorder.release()
+
+                mediaRecorder = null
+                currentAudioFile = null
+                isRecording = false
+
+                scope.launch {
+                    statusText = "Transcribing..."
+                    val result = serverClient.transcribeAudio(baseUrl, audioFile, allowInsecureHttps)
+                    statusText = result.fold(
+                        onSuccess = { text ->
+                            transcript = text
+                            transcriptStore.setLastTranscript(text)
+                            "Transcription ready"
+                        },
+                        onFailure = { "Transcription failed: ${it.message ?: "unknown error"}" },
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text(if (isRecording) "Stop + Transcribe" else "Start Recording")
+        }
+
+        Button(
+            onClick = {
+                if (transcript.isNotBlank()) {
+                    clipboard.setText(AnnotatedString(transcript))
+                    statusText = "Copied transcript"
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        ) {
+            Text("Copy Transcript")
+        }
+
+        OutlinedTextField(
+            value = transcript,
+            onValueChange = {
+                transcript = it
+                transcriptStore.setLastTranscript(it)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            label = { Text("Last Transcript") },
+            minLines = 4,
+        )
 
         Text(
             text = statusText,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp),
+                .padding(top = 10.dp),
         )
 
         Button(
@@ -130,5 +263,19 @@ private fun SetupScreen(
         ) {
             Text("Open Keyboard Settings")
         }
+    }
+}
+
+@Composable
+private fun RowLine(label: String, control: @Composable () -> Unit) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(text = label, modifier = Modifier.weight(1f))
+        control()
     }
 }
