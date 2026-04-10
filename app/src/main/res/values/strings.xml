@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">WhisperClient</string>
     <string name="ime_name">Whisper Keyboard</string>
+    <string name="server_base_url_label">Server base URL</string>
 </resources>
