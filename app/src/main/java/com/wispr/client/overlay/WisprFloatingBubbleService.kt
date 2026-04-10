@@ -116,7 +116,6 @@ class WisprFloatingBubbleService : Service() {
         if (bubbleView != null) {
             return
         }
-        enterForegroundIfNeeded("Ready")
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -208,9 +207,6 @@ class WisprFloatingBubbleService : Service() {
         waveformText = null
         submitButton = null
         cancelButton = null
-        if (!isRecording) {
-            exitForegroundIfNeeded()
-        }
     }
 
     private fun startRecording() {
