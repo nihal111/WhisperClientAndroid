@@ -73,6 +73,24 @@ Optional log streaming during device/full mode:
 TAIL_LOGCAT=1 ./scripts/dev-e2e.sh device
 ```
 
+### Non-Empty Inference Test (Real WAV)
+
+Run a real transcription integration test through the Android client networking path:
+
+```bash
+./scripts/dev-inference-test.sh https://127.0.0.1:3000 /absolute/path/to/sample.wav
+```
+
+Or via env vars:
+
+```bash
+WISPR_SERVER_URL=https://127.0.0.1:3000 \
+WISPR_WAV_PATH=/absolute/path/to/sample.wav \
+./scripts/dev-inference-test.sh
+```
+
+This executes `WisprServerClient.transcribeAudio(...)` in a JVM integration test and asserts a non-empty transcript.
+
 ### Wireless ADB
 
 ```bash
