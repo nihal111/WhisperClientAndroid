@@ -466,6 +466,7 @@ class WisprFloatingBubbleService : Service() {
 
         override fun onTouch(view: View, event: MotionEvent): Boolean {
             val params = bubbleLayoutParams ?: return false
+            val windowView = bubbleView ?: return false
             return when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     startX = params.x
@@ -483,7 +484,7 @@ class WisprFloatingBubbleService : Service() {
                     }
                     params.x = startX + deltaX
                     params.y = startY + deltaY
-                    windowManager.updateViewLayout(view, params)
+                    runCatching { windowManager.updateViewLayout(windowView, params) }
                     true
                 }
                 MotionEvent.ACTION_UP,
@@ -492,7 +493,8 @@ class WisprFloatingBubbleService : Service() {
                         applySnapToEdge()
                         true
                     } else {
-                        false
+                        view.performClick()
+                        true
                     }
                 }
                 else -> false

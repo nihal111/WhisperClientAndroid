@@ -30,8 +30,13 @@ fi
 export ANDROID_SERIAL="$TARGET_SERIAL"
 echo "Using device: $ANDROID_SERIAL"
 
-if [[ "${CLEAN_INSTALL:-1}" == "1" ]]; then
-  echo "Removing stale WhisperClient variants before install..."
+if [[ "${CLEAN_INSTALL:-0}" == "1" ]]; then
+  echo "Removing release variant before install..."
+  "$ADB_BIN" -s "$ANDROID_SERIAL" uninstall com.wispr.client >/dev/null 2>&1 || true
+fi
+
+if [[ "${FULL_RESET:-0}" == "1" ]]; then
+  echo "Performing full reset (debug + release uninstall)..."
   "$ADB_BIN" -s "$ANDROID_SERIAL" uninstall com.wispr.client.debug >/dev/null 2>&1 || true
   "$ADB_BIN" -s "$ANDROID_SERIAL" uninstall com.wispr.client >/dev/null 2>&1 || true
 fi
