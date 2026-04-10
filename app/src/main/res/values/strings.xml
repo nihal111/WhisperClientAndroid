@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">WhisperClient</string>
+    <string name="ime_name">Whisper Keyboard</string>
+</resources>
