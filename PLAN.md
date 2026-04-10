@@ -35,7 +35,7 @@ Exit criteria:
 - Record -> transcribe -> transcript visible in app.
 - IME can insert or copy latest transcript.
 
-### M3. Mac-First Testing Harness (in progress)
+### M3. Mac-First Testing Harness (completed)
 
 - Mac loop script (`assembleDebug + unit tests`).
 - Server smoke check script for `:3000` proxy route.
@@ -51,6 +51,7 @@ Exit criteria:
 - Tighten adb workflows (`install`, `launch`, `set ime`, optional logcat tail).
 - Add explicit `no-device` and `device` execution modes to avoid blocking.
 - Reduce iteration to near one-command update cycle.
+- Add emulator one-command loop for automated smoke and instrumentation checks.
 
 Exit criteria:
 - From code change to test on phone in minimal steps.
@@ -86,7 +87,7 @@ Exit criteria:
 
 ## Current Workstream (Active)
 
-1. Finish M3 by adding a single orchestrator command for mac-only and device runs.
+1. Complete M4 with emulator-first execution and tighter install/retest cycle.
 2. Keep server integration checks aligned with real WhisperServer behavior.
 3. Continue shipping incremental commits that preserve fast iteration.
 

@@ -7,18 +7,19 @@ See device setup options in [docs/DEVICE_SETUP.md](./docs/DEVICE_SETUP.md).
 
 ## Current Status
 
-- M1 in progress: repo, Android scaffold, IME skeleton, fast test-loop scripts.
+- M1-M3 complete: repo, Android scaffold, IME, fast test-loop scripts.
 - App currently includes:
   - launcher setup screen with server config and health check
   - in-app audio recording and `/inference` transcription flow
-  - IME service with `Insert` and `Copy` actions for the last transcript
+  - IME service with direct record/transcribe plus `Insert` and `Copy` actions
+  - clipboard fallback when direct insertion is unavailable
 
 ## Prerequisites
 
 1. JDK 17 installed (`brew install openjdk@17`).
 2. Android command-line tools installed (`brew install --cask android-commandlinetools`).
 3. Android SDK platform-tools installed (`sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools"`).
-4. Android device with Developer Options enabled.
+4. Android device or emulator.
 
 The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
 `~/Library/Android/sdk/platform-tools/adb`, and auto-creates `local.properties`.
@@ -29,17 +30,18 @@ The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
 ./scripts/dev-e2e.sh mac
 ```
 
-Then on phone:
+Then on phone/emulator:
 1. Open WhisperClient app.
 2. Set `Server base URL` (for your HTTPS web proxy this is `https://<mac-ip>:3000`).
 3. Keep `Allow insecure HTTPS` enabled for self-signed local certs.
 4. Tap `Start Recording`, speak, then tap `Stop + Transcribe`.
 5. Tap `Open Keyboard Settings`, enable `Whisper Keyboard`, and select it.
-6. Open any text field and use keyboard `Insert` / `Copy`.
+6. Open any text field and use keyboard `Record` (then `Stop`) to transcribe directly into the focused field.
+7. Use keyboard `Insert` or `Copy` to reuse the last transcript.
 
-## Fast Device Loop
+## Fast Loops
 
-If you cannot connect a phone right now, use:
+### Mac-only
 
 ```bash
 ./scripts/dev-e2e.sh mac
@@ -47,15 +49,19 @@ If you cannot connect a phone right now, use:
 
 This runs local compile + unit tests without a device.
 
-If WhisperServer is running on your Mac, you can also smoke-check it:
+### Emulator
 
 ```bash
-./scripts/dev-server-smoke.sh https://127.0.0.1:3000
+./scripts/dev-emulator-e2e.sh
 ```
 
-The `/inference` empty-body probe may return `502` in proxy mode; this is expected for this smoke check.
+Defaults to `AVD_NAME=WhisperClient_API35`. Override with:
 
-For connected-device iteration:
+```bash
+AVD_NAME=<your_avd_name> ./scripts/dev-emulator-e2e.sh
+```
+
+### Connected Device
 
 ```bash
 ./scripts/dev-e2e.sh device
@@ -91,6 +97,14 @@ WISPR_WAV_PATH=/absolute/path/to/sample.wav \
 
 This executes `WisprServerClient.transcribeAudio(...)` in a JVM integration test and asserts a non-empty transcript.
 
+### Server Smoke Check
+
+```bash
+./scripts/dev-server-smoke.sh https://127.0.0.1:3000
+```
+
+The `/inference` empty-body probe may return `502` in proxy mode; this is expected for this smoke check.
+
 ### Wireless ADB
 
 ```bash
@@ -98,6 +112,7 @@ This executes `WisprServerClient.transcribeAudio(...)` in a JVM integration test
 ```
 
 Example:
+
 ```bash
 ./scripts/setup-wireless-adb.sh 192.168.1.52:5555
 ```
