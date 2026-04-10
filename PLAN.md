@@ -6,112 +6,99 @@ This repository tracks an Android client that captures speech, sends it to Wispr
 
 Build an Android app with a fast local test loop that behaves like Wispr Flow, but targets a self-hosted Mac server endpoint.
 
-## Architecture Decisions
+## Constraints
 
-1. App type: custom Android IME (`InputMethodService`) so it can insert text into focused fields.
-2. UI stack: Kotlin + Jetpack Compose for settings/control surfaces.
-3. Transport: HTTP/HTTPS request to configurable server URL (default: `http://<mac-lan-ip>:3000`).
-4. Output: IME insert (`commitText`) and clipboard fallback mode.
-5. Build flavoring: debug local-first workflow.
+1. Device connectivity is not always available (no USB and not always on same LAN).
+2. Mac-only feedback loops must stay productive without a connected phone.
+3. Server contract is `/inference` multipart upload with JSON `{ "text": "..." }` response.
 
-## Milestones
+## Milestone Roadmap
 
-### M1. Repo + Fast Dev Loop (done)
+### M1. Foundation And Repo Hygiene (completed)
 
-- Create standalone repo (`~/Code/WhisperClient`).
-- Scaffold Android app and baseline modules.
-- Add scripts for rapid iteration:
-  - install/update debug app (`adb install -r` path via Gradle install task)
-  - stream logs (`adb logcat` filtered)
-  - restart IME process
-- Document wireless ADB setup.
-- Exit criteria:
-  - One-command debug install/update loop on connected phone.
-  - Team can run local app and view logs quickly.
+- Standalone repo at `~/Code/WhisperClient`.
+- Android app scaffold + IME baseline.
+- Basic scripts for install, logs, IME selection, environment checks.
+- `.gitignore` hardened for Android/local artifacts.
 
-### M2. Networking Contract + Health Check (in progress)
+Exit criteria:
+- Project builds locally.
+- Debug app can be installed when a device is connected.
 
-- Define explicit request/response JSON schema with Wispr Server.
-- Implement API client + timeout/retry policy.
-- Add health-check action and connection status in app.
-- Exit criteria:
-  - App can hit `/health` and display status.
-  - Sample request returns and renders text.
+### M2. Core Transcription Path (completed)
 
-### M3. Non-IME Prototype Screen
+- App settings for server base URL and insecure HTTPS toggle.
+- In-app recording and upload to `/inference`.
+- Last transcript persistence and IME insert/copy actions.
 
-- Build quick UI for manual testing:
-  - record/send trigger (or typed test payload initially)
-  - response rendering
-  - copy button
-- Exit criteria:
-  - Confirm round-trip phone -> Mac `:3000` -> response visible on phone.
+Exit criteria:
+- Record -> transcribe -> transcript visible in app.
+- IME can insert or copy latest transcript.
 
-### M4. IME MVP
+### M3. Mac-First Testing Harness (in progress)
 
-- Implement minimal keyboard service.
-- Add actions: send audio/text, insert response, copy response.
-- Add mode toggle: `Insert` vs `Copy only`.
-- Exit criteria:
-  - Returned text inserts into common apps (Notes, browser field, chat input).
+- Mac loop script (`assembleDebug + unit tests`).
+- Server smoke check script for `:3000` proxy route.
+- Network client unit tests for URL normalization and response parsing.
+- E2E orchestrator script to run mac and device loops from one entry point.
 
-### M5. Audio Capture and Request Path
+Exit criteria:
+- One command validates build + tests + server reachability on Mac.
+- Optional one command performs device install/launch when connected.
 
-- Implement mic capture, runtime permission flow, and request packaging.
-- Support upload/stream mode consistent with server API.
-- Exit criteria:
-  - Speak -> server transcription -> insert/copy flow end-to-end.
+### M4. Device Loop Acceleration (next)
 
-### Current implemented subset
+- Tighten adb workflows (`install`, `launch`, `set ime`, optional logcat tail).
+- Add explicit `no-device` and `device` execution modes to avoid blocking.
+- Reduce iteration to near one-command update cycle.
 
-- Android debug tooling scripts are in place (`dev-doctor`, `dev-install`, `dev-logcat`, `setup-wireless-adb`).
-- Local environment bootstrap script auto-configures `JAVA_HOME`, SDK path, and `local.properties`.
-- Launcher screen supports:
-  - server base URL save
-  - server reachability check
-  - microphone recording and upload to `/inference`
-  - transcript display and copy
-- IME reads and inserts/copies the most recent transcript.
+Exit criteria:
+- From code change to test on phone in minimal steps.
+- Repeatable workflow documented for USB and wireless adb.
 
-### M6. Debug UX for Iteration
+### M5. IME Reliability And UX Hardening (next)
 
-- Add in-app settings for endpoint override and test actions.
-- Add debug flavor defaults and persistence of selected endpoint.
-- Exit criteria:
-  - Endpoint can be changed without rebuilding.
-  - Switching between local/staging is fast.
+- Handle insertion failures robustly with clipboard fallback and user feedback.
+- Add recent transcript history for quick reuse.
+- Improve status/error messaging for network and permission states.
 
-### M7. Reliability + User Experience Hardening
+Exit criteria:
+- Reliable insertion in common apps.
+- Failures are understandable and recoverable.
 
-- Add robust error surfaces, cancellation, and retry logic.
-- Handle no-network, server timeout, malformed response.
-- Improve keyboard-state transitions and latency feedback.
-- Exit criteria:
-  - Predictable behavior in poor network conditions.
+### M6. Network Robustness (next)
 
-### M8. Packaging and Distribution
+- Add timeout/retry policy and retry-safe error categories.
+- Improve TLS/self-signed diagnostics and host validation messaging.
+- Add payload and response validation for malformed server output.
 
-- Define release process (debug/internal).
-- Keep stable `applicationId` and signing strategy for replace-install updates.
-- Evaluate Firebase App Distribution / internal sharing when needed.
-- Exit criteria:
-  - Repeatable test deployment process for rapid feature validation.
+Exit criteria:
+- Predictable behavior under weak/unstable network conditions.
 
-## Test Loop Targets
+### M7. Packaging And Internal Distribution (next)
 
-- Local iterative loop target: code change -> install/update -> test in under 60 seconds.
-- Prefer wireless ADB to avoid cable friction.
-- Keep a stable installed debug app and replace in place.
+- Define debug vs internal distribution build flavors.
+- Establish signing/versioning update path for frequent tester updates.
+- Document APK delivery/update process for remote device testing.
 
-## Initial Risks
+Exit criteria:
+- Repeatable process to ship frequent updates to installed test app.
 
-1. IME permissions and user enablement flow can be confusing; must add clear onboarding.
-2. Phone-to-Mac connectivity can fail if LAN IP changes; endpoint override required from day one.
-3. Audio payload format must be aligned tightly with server expectations to avoid iteration delays.
-4. Android background and microphone restrictions vary by OS version; test on target device early.
+## Current Workstream (Active)
+
+1. Finish M3 by adding a single orchestrator command for mac-only and device runs.
+2. Keep server integration checks aligned with real WhisperServer behavior.
+3. Continue shipping incremental commits that preserve fast iteration.
+
+## Immediate Task Backlog
+
+1. Add `scripts/dev-e2e.sh` with `mac`, `device`, and `full` modes.
+2. Wire `dev-e2e.sh` into `README.md` as preferred entry point.
+3. Keep validating with `dev-mac-loop.sh` in no-device conditions.
+4. Begin M5 with small, testable IME reliability improvements.
 
 ## Working Style
 
-- Ship in small commits by milestone.
-- Keep docs and scripts up to date with actual command flow.
-- Validate each increment with an executable check where possible.
+1. Ship in small commits by milestone.
+2. Keep docs and scripts aligned with actual executable flow.
+3. Prefer executable checks over manual assertions.

@@ -26,11 +26,7 @@ The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
 ## Quick Start
 
 ```bash
-./scripts/dev-doctor.sh
-./scripts/dev-mac-loop.sh
-./scripts/dev-install.sh
-./scripts/dev-launch-app.sh
-./scripts/dev-logcat.sh
+./scripts/dev-e2e.sh mac
 ```
 
 Then on phone:
@@ -46,7 +42,7 @@ Then on phone:
 If you cannot connect a phone right now, use:
 
 ```bash
-./scripts/dev-mac-loop.sh
+./scripts/dev-e2e.sh mac
 ```
 
 This runs local compile + unit tests without a device.
@@ -58,6 +54,24 @@ If WhisperServer is running on your Mac, you can also smoke-check it:
 ```
 
 The `/inference` empty-body probe may return `502` in proxy mode; this is expected for this smoke check.
+
+For connected-device iteration:
+
+```bash
+./scripts/dev-e2e.sh device
+```
+
+To run both local and device loops in sequence:
+
+```bash
+./scripts/dev-e2e.sh full
+```
+
+Optional log streaming during device/full mode:
+
+```bash
+TAIL_LOGCAT=1 ./scripts/dev-e2e.sh device
+```
 
 ### Wireless ADB
 
