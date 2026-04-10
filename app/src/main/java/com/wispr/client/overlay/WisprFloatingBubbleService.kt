@@ -13,6 +13,8 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
@@ -35,9 +37,11 @@ class WisprFloatingBubbleService : Service() {
 
     private lateinit var transcriptStore: TranscriptStore
     private lateinit var serverConfigStore: ServerConfigStore
+    private lateinit var overlayConfigStore: OverlayConfigStore
 
     private lateinit var windowManager: WindowManager
     private var bubbleView: LinearLayout? = null
+    private var bubbleLayoutParams: WindowManager.LayoutParams? = null
     private var recordButton: Button? = null
     private var copyButton: Button? = null
 
@@ -50,6 +54,7 @@ class WisprFloatingBubbleService : Service() {
         super.onCreate()
         transcriptStore = TranscriptStore(this)
         serverConfigStore = ServerConfigStore(this)
+        overlayConfigStore = OverlayConfigStore(this)
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Idle"))
@@ -128,12 +133,14 @@ class WisprFloatingBubbleService : Service() {
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             android.graphics.PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.END or Gravity.CENTER_VERTICAL
-            x = 24
-            y = 0
+            gravity = Gravity.TOP or Gravity.START
+            x = overlayConfigStore.getBubbleX() ?: defaultStartX()
+            y = overlayConfigStore.getBubbleY() ?: defaultStartY()
         }
+        container.setOnTouchListener(DragTouchListener())
         windowManager.addView(container, params)
         bubbleView = container
+        bubbleLayoutParams = params
         recordButton = record
         copyButton = copy
     }
@@ -142,6 +149,7 @@ class WisprFloatingBubbleService : Service() {
         val view = bubbleView ?: return
         runCatching { windowManager.removeView(view) }
         bubbleView = null
+        bubbleLayoutParams = null
         recordButton = null
         copyButton = null
     }
@@ -256,6 +264,78 @@ class WisprFloatingBubbleService : Service() {
     private fun updateNotification(status: String) {
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, buildNotification(status))
+    }
+
+    private fun defaultStartX(): Int {
+        val displayMetrics = resources.displayMetrics
+        return (displayMetrics.widthPixels * 0.75f).toInt()
+    }
+
+    private fun defaultStartY(): Int {
+        val displayMetrics = resources.displayMetrics
+        return (displayMetrics.heightPixels * 0.45f).toInt()
+    }
+
+    private fun applySnapToEdge() {
+        val view = bubbleView ?: return
+        val params = bubbleLayoutParams ?: return
+        val metrics = resources.displayMetrics
+        val snapped = BubblePositioning.snapToEdge(
+            rawX = params.x,
+            rawY = params.y,
+            bubbleWidth = view.width.coerceAtLeast(1),
+            bubbleHeight = view.height.coerceAtLeast(1),
+            screenWidth = metrics.widthPixels,
+            screenHeight = metrics.heightPixels,
+            edgePadding = 24,
+        )
+        params.x = snapped.x
+        params.y = snapped.y
+        windowManager.updateViewLayout(view, params)
+        overlayConfigStore.setBubblePosition(snapped.x, snapped.y)
+    }
+
+    private inner class DragTouchListener : View.OnTouchListener {
+        private var startX = 0
+        private var startY = 0
+        private var initialTouchX = 0f
+        private var initialTouchY = 0f
+        private var moved = false
+
+        override fun onTouch(view: View, event: MotionEvent): Boolean {
+            val params = bubbleLayoutParams ?: return false
+            return when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = params.x
+                    startY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    moved = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = (event.rawX - initialTouchX).toInt()
+                    val deltaY = (event.rawY - initialTouchY).toInt()
+                    if (kotlin.math.abs(deltaX) > 6 || kotlin.math.abs(deltaY) > 6) {
+                        moved = true
+                    }
+                    params.x = startX + deltaX
+                    params.y = startY + deltaY
+                    windowManager.updateViewLayout(view, params)
+                    true
+                }
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    if (moved) {
+                        applySnapToEdge()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
     }
 
     companion object {

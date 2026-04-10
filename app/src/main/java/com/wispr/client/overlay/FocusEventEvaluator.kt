@@ -3,11 +3,17 @@ package com.wispr.client.overlay
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
+data class FocusTargetState(
+    val hasEditableTarget: Boolean,
+    val hasSensitiveTarget: Boolean,
+    val packageName: String,
+)
+
 object FocusEventEvaluator {
-    fun hasEditableTarget(
+    fun evaluate(
         event: AccessibilityEvent?,
         appPackageName: String,
-    ): Boolean? {
+    ): FocusTargetState? {
         if (event == null) {
             return null
         }
@@ -18,29 +24,56 @@ object FocusEventEvaluator {
         return try {
             val eventPackage = event.packageName?.toString().orEmpty()
             if (eventPackage == appPackageName) {
-                return false
+                return FocusTargetState(
+                    hasEditableTarget = false,
+                    hasSensitiveTarget = false,
+                    packageName = eventPackage,
+                )
             }
-            source.hasEditableDescendant()
+            val state = source.inspectSubtree()
+            FocusTargetState(
+                hasEditableTarget = state.hasEditable,
+                hasSensitiveTarget = state.hasSensitive,
+                packageName = eventPackage,
+            )
         } finally {
             source.recycle()
         }
     }
 
-    private fun AccessibilityNodeInfo.hasEditableDescendant(): Boolean {
+    private data class NodeScan(
+        val hasEditable: Boolean,
+        val hasSensitive: Boolean,
+    )
+
+    private fun AccessibilityNodeInfo.inspectSubtree(): NodeScan {
+        var hasEditable = false
+        var hasSensitive = false
+
         if (isProbablyEditable(this)) {
-            return true
+            hasEditable = true
+            if (isSensitiveField(this)) {
+                hasSensitive = true
+            }
         }
+
         for (index in 0 until childCount) {
             val child = getChild(index) ?: continue
             try {
-                if (child.hasEditableDescendant()) {
-                    return true
+                val childScan = child.inspectSubtree()
+                hasEditable = hasEditable || childScan.hasEditable
+                hasSensitive = hasSensitive || childScan.hasSensitive
+                if (hasEditable && hasSensitive) {
+                    break
                 }
             } finally {
                 child.recycle()
             }
         }
-        return false
+        return NodeScan(
+            hasEditable = hasEditable,
+            hasSensitive = hasSensitive,
+        )
     }
 
     private fun isProbablyEditable(node: AccessibilityNodeInfo): Boolean {
@@ -50,6 +83,24 @@ object FocusEventEvaluator {
         val className = node.className?.toString().orEmpty()
         return className.contains("EditText", ignoreCase = true) ||
             className.contains("TextInput", ignoreCase = true)
+    }
+
+    private fun isSensitiveField(node: AccessibilityNodeInfo): Boolean {
+        if (node.isPassword) {
+            return true
+        }
+        val hint = node.hintText?.toString()?.lowercase().orEmpty()
+        if (
+            hint.contains("password") ||
+            hint.contains("pin") ||
+            hint.contains("card") ||
+            hint.contains("cvv") ||
+            hint.contains("otp")
+        ) {
+            return true
+        }
+        val id = node.viewIdResourceName?.lowercase().orEmpty()
+        return id.contains("password") || id.contains("pin") || id.contains("card")
     }
 
     private fun isRelevantEvent(type: Int): Boolean {

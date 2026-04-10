@@ -38,6 +38,7 @@ This is intentionally decoupled from the existing launcher screen recording flow
 
 2. `WisprFloatingBubbleService`
 - Foreground service hosting `TYPE_APPLICATION_OVERLAY` floating UI.
+- Drag-and-snap bubble position with persisted coordinates.
 - Record/stop buttons for quick dictation.
 - Calls `WisprServerClient.transcribeAudio(...)`.
 - Inserts via accessibility service or clipboard fallback.
@@ -50,7 +51,6 @@ This is intentionally decoupled from the existing launcher screen recording flow
 
 ## Known Gaps (Next Iteration)
 
-1. Drag/reposition and dock behavior for bubble.
-2. Better focus filtering across complex webviews/editors.
-3. Robust handling for Android 14+ microphone foreground-service edge cases.
-4. Better UI polish and expanded quick actions (undo/retry/history).
+1. Better focus filtering across complex webviews/editors.
+2. Robust handling for Android 14+ microphone foreground-service edge cases.
+3. Better UI polish and expanded quick actions (undo/retry/history).

@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.wispr.client.overlay.AccessibilityPermission
+import com.wispr.client.overlay.OverlayConfigStore
 import com.wispr.client.overlay.OverlayPermission
 import com.wispr.client.overlay.WisprFloatingBubbleService
 import com.wispr.client.overlay.WisprFocusAccessibilityService
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val serverConfigStore = ServerConfigStore(this)
         val transcriptStore = TranscriptStore(this)
+        val overlayConfigStore = OverlayConfigStore(this)
         val serverClient = WisprServerClient()
 
         setContent {
@@ -57,6 +59,7 @@ class MainActivity : ComponentActivity() {
                     SetupScreen(
                         serverConfigStore = serverConfigStore,
                         transcriptStore = transcriptStore,
+                        overlayConfigStore = overlayConfigStore,
                         serverClient = serverClient,
                         onOpenImeSettings = {
                             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
@@ -94,6 +97,7 @@ class MainActivity : ComponentActivity() {
 private fun SetupScreen(
     serverConfigStore: ServerConfigStore,
     transcriptStore: TranscriptStore,
+    overlayConfigStore: OverlayConfigStore,
     serverClient: WisprServerClient,
     onOpenImeSettings: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
@@ -112,6 +116,7 @@ private fun SetupScreen(
     var isRecording by remember { mutableStateOf(false) }
     var canDrawOverlay by remember { mutableStateOf(false) }
     var accessibilityEnabled by remember { mutableStateOf(false) }
+    var showBubbleWithoutKeyboard by remember { mutableStateOf(false) }
 
     var mediaRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var currentAudioFile by remember { mutableStateOf<File?>(null) }
@@ -152,6 +157,7 @@ private fun SetupScreen(
             context,
             WisprFocusAccessibilityService::class.java,
         )
+        showBubbleWithoutKeyboard = overlayConfigStore.getShowBubbleWithoutKeyboard()
     }
 
     Column(
@@ -315,6 +321,19 @@ private fun SetupScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
+        )
+
+        RowLine(
+            label = "Show bubble without keyboard",
+            control = {
+                Switch(
+                    checked = showBubbleWithoutKeyboard,
+                    onCheckedChange = { value ->
+                        showBubbleWithoutKeyboard = value
+                        overlayConfigStore.setShowBubbleWithoutKeyboard(value)
+                    },
+                )
+            },
         )
 
         Button(

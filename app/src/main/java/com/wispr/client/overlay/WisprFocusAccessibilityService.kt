@@ -5,24 +5,36 @@ import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import java.lang.ref.WeakReference
 
 class WisprFocusAccessibilityService : AccessibilityService() {
     private var lastEditableState: Boolean? = null
+    private lateinit var overlayConfigStore: OverlayConfigStore
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        overlayConfigStore = OverlayConfigStore(this)
         instanceRef = WeakReference(this)
         Log.i(TAG, "Accessibility service connected")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        val editable = FocusEventEvaluator.hasEditableTarget(event, packageName) ?: return
-        if (editable == lastEditableState) {
+        val focusState = FocusEventEvaluator.evaluate(event, packageName) ?: return
+        val shouldShow = BubbleVisibilityPolicy.shouldShow(
+            hasEditableTarget = focusState.hasEditableTarget,
+            hasSensitiveTarget = focusState.hasSensitiveTarget,
+            imeWindowVisible = isInputMethodWindowVisible(),
+            showWithoutKeyboard = overlayConfigStore.getShowBubbleWithoutKeyboard(),
+            eventPackageName = focusState.packageName,
+            ownPackageName = packageName,
+        )
+
+        if (shouldShow == lastEditableState) {
             return
         }
-        lastEditableState = editable
-        val action = if (editable) {
+        lastEditableState = shouldShow
+        val action = if (shouldShow) {
             WisprFloatingBubbleService.ACTION_FOCUS_EDITABLE
         } else {
             WisprFloatingBubbleService.ACTION_FOCUS_NON_EDITABLE
@@ -91,6 +103,12 @@ class WisprFocusAccessibilityService : AccessibilityService() {
             return true
         }
         return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    }
+
+    private fun isInputMethodWindowVisible(): Boolean {
+        return windows.any { window ->
+            window.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD
+        }
     }
 
     companion object {

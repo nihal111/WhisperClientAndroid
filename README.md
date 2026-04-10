@@ -51,6 +51,7 @@ The app now includes a separate `overlay` subsystem that approximates a Wispr Fl
 4. Focus a text input field in another app; the bubble appears.
 5. Tap `Record` then `Stop` to transcribe and insert text.
 6. If insertion is unavailable, text falls back to clipboard.
+7. Drag the bubble; it snaps to screen edge and remembers position.
 
 ## Fast Loops
 
