@@ -18,7 +18,7 @@ import javax.net.ssl.X509TrustManager
 class WisprServerClient {
 
     suspend fun healthCheck(baseUrl: String, allowInsecureHttps: Boolean): Result<Int> = withContext(Dispatchers.IO) {
-        val normalizedBase = baseUrl.trim().trimEnd('/')
+        val normalizedBase = normalizeBaseUrl(baseUrl)
         if (normalizedBase.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("Base URL is empty"))
         }
@@ -45,7 +45,7 @@ class WisprServerClient {
         audioFile: File,
         allowInsecureHttps: Boolean,
     ): Result<String> = withContext(Dispatchers.IO) {
-        val normalizedBase = baseUrl.trim().trimEnd('/')
+        val normalizedBase = normalizeBaseUrl(baseUrl)
         if (normalizedBase.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("Base URL is empty"))
         }
@@ -83,11 +83,7 @@ class WisprServerClient {
                 return@withContext Result.failure(IOException("HTTP $code: $rawResponse"))
             }
 
-            val text = try {
-                JSONObject(rawResponse).optString("text").trim()
-            } catch (_: Exception) {
-                rawResponse.trim()
-            }
+            val text = parseTranscriptionText(rawResponse)
 
             if (text.isBlank()) {
                 Result.failure(IOException("Server returned empty transcription"))
@@ -154,5 +150,29 @@ class WisprServerClient {
         val context = SSLContext.getInstance("TLS")
         context.init(null, arrayOf<TrustManager>(trustManager), java.security.SecureRandom())
         context
+    }
+
+    internal fun normalizeBaseUrl(baseUrl: String): String {
+        return baseUrl.trim().trimEnd('/')
+    }
+
+    internal fun parseTranscriptionText(rawResponse: String): String {
+        val regexMatch = TEXT_JSON_REGEX.find(rawResponse)
+        if (regexMatch != null) {
+            return regexMatch.groupValues[1]
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .trim()
+        }
+
+        return try {
+            JSONObject(rawResponse).optString("text").trim()
+        } catch (_: Throwable) {
+            rawResponse.trim()
+        }
+    }
+
+    private companion object {
+        val TEXT_JSON_REGEX = Regex("\"text\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"")
     }
 }
