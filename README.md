@@ -3,6 +3,7 @@
 Android client and keyboard (IME) for sending speech/text input to a self-hosted Wispr Server and inserting/copying responses.
 
 See the execution roadmap in [PLAN.md](./PLAN.md).
+See device setup options in [docs/DEVICE_SETUP.md](./docs/DEVICE_SETUP.md).
 
 ## Current Status
 
@@ -26,6 +27,7 @@ The scripts source `scripts/env-android.sh`, which sets `JAVA_HOME`, prefers
 
 ```bash
 ./scripts/dev-doctor.sh
+./scripts/dev-mac-loop.sh
 ./scripts/dev-install.sh
 ./scripts/dev-launch-app.sh
 ./scripts/dev-logcat.sh
@@ -40,6 +42,20 @@ Then on phone:
 6. Open any text field and use keyboard `Insert` / `Copy`.
 
 ## Fast Device Loop
+
+If you cannot connect a phone right now, use:
+
+```bash
+./scripts/dev-mac-loop.sh
+```
+
+This runs local compile + unit tests without a device.
+
+If WhisperServer is running on your Mac, you can also smoke-check it:
+
+```bash
+./scripts/dev-server-smoke.sh https://127.0.0.1:3000
+```
 
 ### Wireless ADB
 
