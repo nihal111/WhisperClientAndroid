@@ -21,7 +21,6 @@ import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.wispr.client.R
@@ -32,8 +31,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -50,7 +47,7 @@ class WisprFloatingBubbleService : Service() {
     private var bubbleLayoutParams: WindowManager.LayoutParams? = null
     private var idleButton: ImageView? = null
     private var recordingPanel: LinearLayout? = null
-    private var waveformText: TextView? = null
+    private var waveformView: WaveformView? = null
     private var submitButton: ImageView? = null
     private var cancelButton: ImageView? = null
 
@@ -60,7 +57,6 @@ class WisprFloatingBubbleService : Service() {
     private var hasEditableFocus = false
     private var isInForeground = false
 
-    private var waveformJob = serviceScope.launch { }
 
     override fun onCreate() {
         super.onCreate()
@@ -151,12 +147,14 @@ class WisprFloatingBubbleService : Service() {
             setOnClickListener { cancelRecording() }
         }
 
-        val waveform = TextView(this).apply {
-            text = WAVE_FRAMES.first()
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 18f
-            setPadding(16.dp(), 0, 16.dp(), 0)
-            gravity = Gravity.CENTER
+        val waveform = WaveformView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                32.dp(),
+            ).apply {
+                marginStart = 8.dp()
+                marginEnd = 8.dp()
+            }
         }
 
         val submit = ImageView(this).apply {
@@ -208,7 +206,7 @@ class WisprFloatingBubbleService : Service() {
         bubbleLayoutParams = params
         idleButton = idle
         recordingPanel = controls
-        waveformText = waveform
+        waveformView = waveform
         submitButton = submit
         cancelButton = cancel
 
@@ -223,7 +221,7 @@ class WisprFloatingBubbleService : Service() {
         bubbleLayoutParams = null
         idleButton = null
         recordingPanel = null
-        waveformText = null
+        waveformView = null
         submitButton = null
         cancelButton = null
     }
@@ -338,7 +336,7 @@ class WisprFloatingBubbleService : Service() {
         recordingPanel?.visibility = View.GONE
         submitButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
         cancelButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
-        waveformText?.text = WAVE_FRAMES.first()
+        waveformView?.stopAnimation()
         // Restore the saved position before snapping so the bubble returns
         // to the edge the user originally placed it on, not the shifted
         // position from the wider recording pill.
@@ -362,23 +360,15 @@ class WisprFloatingBubbleService : Service() {
         recordingPanel?.visibility = View.VISIBLE
         submitButton?.apply { isEnabled = false; alpha = 0.4f; isClickable = false }
         cancelButton?.apply { isEnabled = false; alpha = 0.4f; isClickable = false }
-        waveformText?.text = "…"
+        waveformView?.stopAnimation()
     }
 
     private fun startWaveformAnimation() {
-        stopWaveformAnimation()
-        waveformJob = serviceScope.launch {
-            var frame = 0
-            while (isActive && isRecording) {
-                waveformText?.text = WAVE_FRAMES[frame % WAVE_FRAMES.size]
-                frame += 1
-                delay(120)
-            }
-        }
+        waveformView?.startAnimation()
     }
 
     private fun stopWaveformAnimation() {
-        waveformJob.cancel()
+        waveformView?.stopAnimation()
     }
 
     private fun copyToClipboard(text: String) {
@@ -574,8 +564,6 @@ class WisprFloatingBubbleService : Service() {
         private const val TAG = "WisprOverlaySvc"
         private const val CHANNEL_ID = "wispr_overlay_channel"
         private const val NOTIFICATION_ID = 2001
-        private val WAVE_FRAMES = listOf("▁▂▃▅▇▅▃▂", "▂▃▅▇▅▃▂▁", "▃▅▇▅▃▂▁▂", "▅▇▅▃▂▁▂▃")
-
         fun sendCommand(context: Context, action: String) {
             val intent = Intent(context, WisprFloatingBubbleService::class.java).setAction(action)
             try {
