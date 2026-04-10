@@ -17,6 +17,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
@@ -458,6 +459,7 @@ class WisprFloatingBubbleService : Service() {
     }
 
     private inner class DragTouchListener : View.OnTouchListener {
+        private val touchSlopPx = ViewConfiguration.get(this@WisprFloatingBubbleService).scaledTouchSlop * 2
         private var startX = 0
         private var startY = 0
         private var initialTouchX = 0f
@@ -479,8 +481,11 @@ class WisprFloatingBubbleService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = (event.rawX - initialTouchX).toInt()
                     val deltaY = (event.rawY - initialTouchY).toInt()
-                    if (kotlin.math.abs(deltaX) > 6 || kotlin.math.abs(deltaY) > 6) {
+                    if (!moved && (kotlin.math.abs(deltaX) > touchSlopPx || kotlin.math.abs(deltaY) > touchSlopPx)) {
                         moved = true
+                    }
+                    if (!moved) {
+                        return true
                     }
                     params.x = startX + deltaX
                     params.y = startY + deltaY
