@@ -21,6 +21,21 @@ if [[ "$DEVICE_COUNT" -lt 1 ]]; then
   exit 1
 fi
 
+TARGET_SERIAL="${ANDROID_SERIAL:-$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {print $1}' | head -n1)}"
+if [[ -z "$TARGET_SERIAL" ]]; then
+  echo "Unable to resolve a target device serial."
+  exit 1
+fi
+
+export ANDROID_SERIAL="$TARGET_SERIAL"
+echo "Using device: $ANDROID_SERIAL"
+
+if [[ "${CLEAN_INSTALL:-1}" == "1" ]]; then
+  echo "Removing stale WhisperClient variants before install..."
+  "$ADB_BIN" -s "$ANDROID_SERIAL" uninstall com.wispr.client.debug >/dev/null 2>&1 || true
+  "$ADB_BIN" -s "$ANDROID_SERIAL" uninstall com.wispr.client >/dev/null 2>&1 || true
+fi
+
 ./gradlew :app:installDebug
 
 echo "Installed/updated com.wispr.client.debug"
