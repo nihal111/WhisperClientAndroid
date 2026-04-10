@@ -3,7 +3,9 @@ package com.wispr.client.overlay
 import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.Handler
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -13,6 +15,8 @@ import java.lang.ref.WeakReference
 class WisprFocusAccessibilityService : AccessibilityService() {
     private var lastEditableState: Boolean? = null
     private lateinit var overlayConfigStore: OverlayConfigStore
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val delayedHide = Runnable { setBubbleVisible(false) }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -31,12 +35,23 @@ class WisprFocusAccessibilityService : AccessibilityService() {
             eventPackageName = focusState.packageName,
             ownPackageName = packageName,
         )
+        if (shouldShow) {
+            mainHandler.removeCallbacks(delayedHide)
+            setBubbleVisible(true)
+        } else if (lastEditableState == true) {
+            mainHandler.removeCallbacks(delayedHide)
+            mainHandler.postDelayed(delayedHide, HIDE_DEBOUNCE_MS)
+        } else {
+            setBubbleVisible(false)
+        }
+    }
 
-        if (shouldShow == lastEditableState) {
+    private fun setBubbleVisible(visible: Boolean) {
+        if (visible == lastEditableState) {
             return
         }
-        lastEditableState = shouldShow
-        val action = if (shouldShow) {
+        lastEditableState = visible
+        val action = if (visible) {
             WisprFloatingBubbleService.ACTION_FOCUS_EDITABLE
         } else {
             WisprFloatingBubbleService.ACTION_FOCUS_NON_EDITABLE
@@ -47,6 +62,7 @@ class WisprFocusAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(delayedHide)
         if (instanceRef?.get() === this) {
             instanceRef = null
         }
@@ -143,6 +159,7 @@ class WisprFocusAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "WisprA11y"
+        private const val HIDE_DEBOUNCE_MS = 450L
         private var instanceRef: WeakReference<WisprFocusAccessibilityService>? = null
 
         fun getInstance(): WisprFocusAccessibilityService? = instanceRef?.get()

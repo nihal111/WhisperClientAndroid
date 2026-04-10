@@ -60,4 +60,32 @@ class BubbleVisibilityPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `keeps bubble when keyboard visible even if transient non-editable event arrives`() {
+        assertTrue(
+            BubbleVisibilityPolicy.shouldShow(
+                hasEditableTarget = false,
+                hasSensitiveTarget = false,
+                imeWindowVisible = true,
+                showWithoutKeyboard = false,
+                eventPackageName = "com.example.notes",
+                ownPackageName = "com.wispr.client",
+            ),
+        )
+    }
+
+    @Test
+    fun `hides bubble on non-editable events when keyboard is not visible`() {
+        assertFalse(
+            BubbleVisibilityPolicy.shouldShow(
+                hasEditableTarget = false,
+                hasSensitiveTarget = false,
+                imeWindowVisible = false,
+                showWithoutKeyboard = true,
+                eventPackageName = "com.example.notes",
+                ownPackageName = "com.wispr.client",
+            ),
+        )
+    }
 }

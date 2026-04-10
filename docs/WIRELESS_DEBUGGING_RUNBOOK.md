@@ -119,3 +119,34 @@ adb devices
 ```
 
 If that fails repeatedly, re-run full pairing flow.
+
+## Cleanup (Avoid Duplicate Devices / Stale Installs)
+
+If `adb devices` shows both an `ip:port` entry and an `adb-..._adb-tls-connect._tcp` entry for the same phone, disconnect the mDNS alias:
+
+```bash
+adb disconnect <adb-mdns-entry>
+adb devices -l
+```
+
+Example:
+
+```bash
+adb disconnect adb-R5CW41XCM9W-WtbXau._adb-tls-connect._tcp
+```
+
+Only one device entry should remain for stable test runs.
+
+To uninstall older app variants from the phone:
+
+```bash
+adb shell pm list packages | rg com.wispr.client
+adb uninstall com.wispr.client.debug
+adb uninstall com.wispr.client
+```
+
+Reinstall latest debug build:
+
+```bash
+./gradlew installDebug
+```

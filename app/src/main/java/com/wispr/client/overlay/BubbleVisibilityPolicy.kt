@@ -18,11 +18,13 @@ object BubbleVisibilityPolicy {
         eventPackageName: String,
         ownPackageName: String,
     ): Boolean {
-        if (!hasEditableTarget) return false
         if (hasSensitiveTarget) return false
         if (eventPackageName == ownPackageName) return false
         if (isBlockedPackage(eventPackageName)) return false
-        return showWithoutKeyboard || imeWindowVisible
+        if (hasEditableTarget) {
+            return showWithoutKeyboard || imeWindowVisible
+        }
+        return imeWindowVisible
     }
 
     internal fun isBlockedPackage(packageName: String): Boolean {
