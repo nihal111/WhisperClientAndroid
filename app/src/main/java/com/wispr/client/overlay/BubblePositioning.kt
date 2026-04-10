@@ -22,4 +22,20 @@ object BubblePositioning {
         val snappedY = rawY.coerceIn(minY, maxY)
         return BubblePosition(snappedX, snappedY)
     }
+
+    fun clampToScreen(
+        rawX: Int,
+        rawY: Int,
+        bubbleWidth: Int,
+        bubbleHeight: Int,
+        screenWidth: Int,
+        screenHeight: Int,
+        edgePadding: Int,
+    ): BubblePosition {
+        val minX = edgePadding
+        val maxX = (screenWidth - bubbleWidth - edgePadding).coerceAtLeast(minX)
+        val minY = edgePadding
+        val maxY = (screenHeight - bubbleHeight - edgePadding).coerceAtLeast(minY)
+        return BubblePosition(rawX.coerceIn(minX, maxX), rawY.coerceIn(minY, maxY))
+    }
 }

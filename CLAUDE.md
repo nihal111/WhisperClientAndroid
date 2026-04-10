@@ -35,13 +35,13 @@ The Android client connects to `https://100.89.5.62:3000/inference`. The phone m
 ```bash
 source ./scripts/env-android.sh
 ./gradlew :app:installDebug
-"$ADB_BIN" -s 100.110.240.42:36915 shell am start -n com.wispr.client.debug/com.wispr.client.MainActivity
+"$ADB_BIN" -s 100.110.240.42:42533 shell am start -n com.wispr.client.debug/com.wispr.client.MainActivity
 ```
 
 Or as a single command:
 
 ```bash
-source ./scripts/env-android.sh && ./gradlew :app:installDebug && "$ADB_BIN" -s 100.110.240.42:36915 shell am start -n com.wispr.client.debug/com.wispr.client.MainActivity
+source ./scripts/env-android.sh && ./gradlew :app:installDebug && "$ADB_BIN" -s 100.110.240.42:42533 shell am start -n com.wispr.client.debug/com.wispr.client.MainActivity
 ```
 
 ### 3. Test on phone
@@ -56,12 +56,12 @@ source ./scripts/env-android.sh && ./gradlew :app:installDebug && "$ADB_BIN" -s 
 
 ```bash
 source ./scripts/env-android.sh
-"$ADB_BIN" -s 100.110.240.42:36915 logcat -s WisprOverlaySvc:* WisprA11y:* WisprIME:*
+"$ADB_BIN" -s 100.110.240.42:42533 logcat -s WisprOverlaySvc:* WisprA11y:* WisprIME:*
 ```
 
 ## Wireless ADB
 
-The phone (Samsung S24 Ultra) is connected over wireless ADB at `100.110.240.42:36915`. Always use `-s 100.110.240.42:36915` to target it explicitly — an mDNS alias auto-reconnects and causes "more than one device" errors. Disconnect it with:
+The phone (Samsung S24 Ultra) is connected over wireless ADB at `100.110.240.42:42533`. Always use `-s 100.110.240.42:42533` to target it explicitly — an mDNS alias auto-reconnects and causes "more than one device" errors. Disconnect it with:
 
 ```bash
 "$ADB_BIN" disconnect adb-R5CW41XCM9W-WtbXau._adb-tls-connect._tcp

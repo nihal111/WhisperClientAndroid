@@ -19,7 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
@@ -48,11 +48,11 @@ class WisprFloatingBubbleService : Service() {
     private lateinit var windowManager: WindowManager
     private var bubbleView: LinearLayout? = null
     private var bubbleLayoutParams: WindowManager.LayoutParams? = null
-    private var idleButton: Button? = null
+    private var idleButton: ImageView? = null
     private var recordingPanel: LinearLayout? = null
     private var waveformText: TextView? = null
-    private var submitButton: Button? = null
-    private var cancelButton: Button? = null
+    private var submitButton: ImageView? = null
+    private var cancelButton: ImageView? = null
 
     private var mediaRecorder: MediaRecorder? = null
     private var currentAudioFile: File? = null
@@ -118,47 +118,72 @@ class WisprFloatingBubbleService : Service() {
             return
         }
 
+        val density = resources.displayMetrics.density
+        fun Int.dp() = (this * density + 0.5f).toInt()
+
         val container = DragInterceptLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xCC1E1E1E.toInt())
         }
 
-        val idle = Button(this).apply {
-            text = "Mic"
-            isAllCaps = false
+        val idle = ImageView(this).apply {
+            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_mic_white))
+            setBackgroundResource(R.drawable.bubble_idle_bg)
+            layoutParams = LinearLayout.LayoutParams(52.dp(), 52.dp())
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val pad = 14.dp()
+            setPadding(pad, pad, pad, pad)
+            elevation = 6.dp().toFloat()
+            isClickable = true
+            isFocusable = true
             setOnClickListener { startRecording() }
+        }
+
+        val cancel = ImageView(this).apply {
+            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_close_white))
+            setBackgroundResource(R.drawable.bubble_cancel_bg)
+            layoutParams = LinearLayout.LayoutParams(40.dp(), 40.dp())
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val pad = 10.dp()
+            setPadding(pad, pad, pad, pad)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { cancelRecording() }
         }
 
         val waveform = TextView(this).apply {
             text = WAVE_FRAMES.first()
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 18f
-            setPadding(12, 0, 12, 0)
+            setPadding(16.dp(), 0, 16.dp(), 0)
+            gravity = Gravity.CENTER
         }
 
-        val submit = Button(this).apply {
-            text = "✓"
-            isAllCaps = false
-            textSize = 20f
+        val submit = ImageView(this).apply {
+            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_check_white))
+            setBackgroundResource(R.drawable.bubble_submit_bg)
+            layoutParams = LinearLayout.LayoutParams(44.dp(), 44.dp())
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val pad = 10.dp()
+            setPadding(pad, pad, pad, pad)
+            elevation = 2.dp().toFloat()
+            isClickable = true
+            isFocusable = true
             setOnClickListener { stopAndSubmitRecording() }
-        }
-
-        val cancel = Button(this).apply {
-            text = "✕"
-            isAllCaps = false
-            textSize = 20f
-            setOnClickListener { cancelRecording() }
         }
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.bubble_bar_bg)
+            val hPad = 8.dp()
+            val vPad = 6.dp()
+            setPadding(hPad, vPad, hPad, vPad)
+            elevation = 6.dp().toFloat()
             visibility = View.GONE
+            addView(cancel)
             addView(waveform)
             addView(submit)
-            addView(cancel)
         }
 
         container.addView(idle)
@@ -311,23 +336,25 @@ class WisprFloatingBubbleService : Service() {
     private fun setIdleMode() {
         idleButton?.visibility = View.VISIBLE
         recordingPanel?.visibility = View.GONE
-        submitButton?.isEnabled = true
-        cancelButton?.isEnabled = true
+        submitButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
+        cancelButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
         waveformText?.text = WAVE_FRAMES.first()
+        bubbleView?.post { applySnapToEdge() }
     }
 
     private fun setRecordingMode() {
         idleButton?.visibility = View.GONE
         recordingPanel?.visibility = View.VISIBLE
-        submitButton?.isEnabled = true
-        cancelButton?.isEnabled = true
+        submitButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
+        cancelButton?.apply { isEnabled = true; alpha = 1f; isClickable = true }
+        bubbleView?.post { applyClampToScreen() }
     }
 
     private fun setTranscribingMode() {
         idleButton?.visibility = View.GONE
         recordingPanel?.visibility = View.VISIBLE
-        submitButton?.isEnabled = false
-        cancelButton?.isEnabled = false
+        submitButton?.apply { isEnabled = false; alpha = 0.4f; isClickable = false }
+        cancelButton?.apply { isEnabled = false; alpha = 0.4f; isClickable = false }
         waveformText?.text = "…"
     }
 
@@ -447,8 +474,26 @@ class WisprFloatingBubbleService : Service() {
         )
         params.x = snapped.x
         params.y = snapped.y
-        windowManager.updateViewLayout(view, params)
+        runCatching { windowManager.updateViewLayout(view, params) }
         overlayConfigStore.setBubblePosition(snapped.x, snapped.y)
+    }
+
+    private fun applyClampToScreen() {
+        val view = bubbleView ?: return
+        val params = bubbleLayoutParams ?: return
+        val metrics = resources.displayMetrics
+        val clamped = BubblePositioning.clampToScreen(
+            rawX = params.x,
+            rawY = params.y,
+            bubbleWidth = view.width.coerceAtLeast(1),
+            bubbleHeight = view.height.coerceAtLeast(1),
+            screenWidth = metrics.widthPixels,
+            screenHeight = metrics.heightPixels,
+            edgePadding = 24,
+        )
+        params.x = clamped.x
+        params.y = clamped.y
+        runCatching { windowManager.updateViewLayout(view, params) }
     }
 
     private inner class DragInterceptLayout(context: Context) : LinearLayout(context) {
@@ -488,8 +533,18 @@ class WisprFloatingBubbleService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val deltaX = (event.rawX - initialTouchX).toInt()
                     val deltaY = (event.rawY - initialTouchY).toInt()
-                    params.x = startX + deltaX
-                    params.y = startY + deltaY
+                    val metrics = resources.displayMetrics
+                    val clamped = BubblePositioning.clampToScreen(
+                        rawX = startX + deltaX,
+                        rawY = startY + deltaY,
+                        bubbleWidth = windowView.width.coerceAtLeast(1),
+                        bubbleHeight = windowView.height.coerceAtLeast(1),
+                        screenWidth = metrics.widthPixels,
+                        screenHeight = metrics.heightPixels,
+                        edgePadding = 24,
+                    )
+                    params.x = clamped.x
+                    params.y = clamped.y
                     runCatching { windowManager.updateViewLayout(windowView, params) }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
