@@ -34,6 +34,6 @@ WISPR_SERVER_URL="$SERVER_URL" \
 WISPR_WAV_PATH="$WAV_PATH" \
 WISPR_ALLOW_INSECURE_HTTPS="$ALLOW_INSECURE_HTTPS" \
 ./gradlew :app:testDebugUnitTest \
-  --tests "com.wispr.client.network.WisprServerIntegrationTest.transcribeAudio with real wav returns non-empty text"
+  --tests "com.wispr.client.network.WhisperServerIntegrationTest.transcribeAudio with real wav returns non-empty text"
 
 echo "Integration test passed"

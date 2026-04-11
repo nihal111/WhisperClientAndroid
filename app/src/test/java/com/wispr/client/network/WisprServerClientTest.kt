@@ -6,9 +6,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
-class WisprServerClientTest {
+class WhisperServerClientTest {
 
-    private val client = WisprServerClient()
+    private val client = WhisperServerClient()
 
     @Test
     fun `normalizeBaseUrl trims whitespace and trailing slash`() {

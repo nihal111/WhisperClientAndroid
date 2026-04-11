@@ -1,12 +1,12 @@
 # Flow Bubble Architecture (Experimental)
 
-This document tracks the Wispr Flow-like floating widget subsystem added under `app/src/main/java/com/wispr/client/overlay`.
+This document tracks the Whisper Flow-like floating widget subsystem added under `app/src/main/java/com/wispr/client/overlay`.
 
 ## Goal
 
 Show a floating transcription bubble when a text input gains focus in any app, then:
 1. record speech,
-2. send audio to Wispr Server (`/inference`),
+2. send audio to Whisper Server (`/inference`),
 3. insert text into focused field (or copy to clipboard fallback).
 
 This is intentionally decoupled from the existing launcher screen recording flow.
@@ -24,26 +24,26 @@ This is intentionally decoupled from the existing launcher screen recording flow
 ### User-Granted / Special Access (Manual)
 
 1. Overlay permission (`ACTION_MANAGE_OVERLAY_PERMISSION`)
-2. Accessibility service enable (`ACTION_ACCESSIBILITY_SETTINGS`) for `WisprFocusAccessibilityService`
+2. Accessibility service enable (`ACTION_ACCESSIBILITY_SETTINGS`) for `WhisperFocusAccessibilityService`
 3. Microphone runtime permission
 4. Notifications permission (Android 13+ recommended for foreground service notification visibility)
 
 ## Components
 
-1. `WisprFocusAccessibilityService`
+1. `WhisperFocusAccessibilityService`
 - Watches focus/content accessibility events.
 - Detects editable focus targets.
 - Starts/stops bubble service based on focus.
 - Provides focused-field text insertion API.
 
-2. `WisprFloatingBubbleService`
+2. `WhisperFloatingBubbleService`
 - Foreground service hosting `TYPE_APPLICATION_OVERLAY` floating UI.
 - Drag-and-snap bubble position with persisted coordinates.
 - Idle state with single `Mic` action.
 - Recording state with animated waveform plus:
   - `✓` submit (stop + transcribe)
   - `✕` cancel (discard audio)
-- Calls `WisprServerClient.transcribeAudio(...)`.
+- Calls `WhisperServerClient.transcribeAudio(...)`.
 - Inserts via accessibility service or clipboard fallback.
 
 3. Helpers

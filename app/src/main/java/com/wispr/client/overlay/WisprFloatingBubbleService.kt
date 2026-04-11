@@ -26,7 +26,7 @@ import androidx.core.content.ContextCompat
 import com.wispr.client.R
 import com.wispr.client.data.ServerConfigStore
 import com.wispr.client.data.TranscriptStore
-import com.wispr.client.network.WisprServerClient
+import com.wispr.client.network.WhisperServerClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,9 +34,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
 
-class WisprFloatingBubbleService : Service() {
+class WhisperFloatingBubbleService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val serverClient = WisprServerClient()
+    private val serverClient = WhisperServerClient()
 
     private lateinit var transcriptStore: TranscriptStore
     private lateinit var serverConfigStore: ServerConfigStore
@@ -56,6 +56,7 @@ class WisprFloatingBubbleService : Service() {
     private var isRecording = false
     private var hasEditableFocus = false
     private var isInForeground = false
+    private var amplitudePollingJob: kotlinx.coroutines.Job? = null
 
 
     override fun onCreate() {
@@ -248,12 +249,26 @@ class WisprFloatingBubbleService : Service() {
             enterForegroundIfNeeded("Recording...")
             setRecordingMode()
             startWaveformAnimation()
+            startAmplitudePolling()
             updateNotification("Recording...")
         } catch (error: Exception) {
             Log.e(TAG, "Failed to start overlay recording", error)
             releaseRecorder(deleteTempAudio = true)
             setIdleMode()
             updateNotification("Record failed")
+        }
+    }
+
+    private fun startAmplitudePolling() {
+        amplitudePollingJob?.cancel()
+        amplitudePollingJob = serviceScope.launch {
+            while (isRecording) {
+                val amplitude = mediaRecorder?.maxAmplitude ?: 0
+                // Normalize 0..32767 to 0..1
+                val normalized = amplitude.toFloat() / 32767f
+                waveformView?.updateAmplitude(normalized)
+                kotlinx.coroutines.delay(50) // 20 fps
+            }
         }
     }
 
@@ -305,7 +320,7 @@ class WisprFloatingBubbleService : Service() {
             result.fold(
                 onSuccess = { text ->
                     transcriptStore.setLastTranscript(text)
-                    val didInsert = WisprFocusAccessibilityService.getInstance()
+                    val didInsert = WhisperFocusAccessibilityService.getInstance()
                         ?.insertTextIntoFocusedField(text)
                         ?: false
                     if (!didInsert) {
@@ -377,6 +392,9 @@ class WisprFloatingBubbleService : Service() {
     }
 
     private fun releaseRecorder(deleteTempAudio: Boolean) {
+        amplitudePollingJob?.cancel()
+        amplitudePollingJob = null
+
         mediaRecorder?.let { recorder ->
             runCatching { recorder.release() }
         }
@@ -561,11 +579,11 @@ class WisprFloatingBubbleService : Service() {
         const val ACTION_FOCUS_EDITABLE = "com.wispr.client.overlay.FOCUS_EDITABLE"
         const val ACTION_FOCUS_NON_EDITABLE = "com.wispr.client.overlay.FOCUS_NON_EDITABLE"
 
-        private const val TAG = "WisprOverlaySvc"
+        private const val TAG = "WhisperOverlaySvc"
         private const val CHANNEL_ID = "wispr_overlay_channel"
         private const val NOTIFICATION_ID = 2001
         fun sendCommand(context: Context, action: String) {
-            val intent = Intent(context, WisprFloatingBubbleService::class.java).setAction(action)
+            val intent = Intent(context, WhisperFloatingBubbleService::class.java).setAction(action)
             try {
                 context.startService(intent)
             } catch (error: IllegalStateException) {

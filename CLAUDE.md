@@ -1,6 +1,6 @@
 # WhisperClient
 
-Android client for Wispr Flow — voice-to-text via a floating overlay bubble.
+Android client for Whisper Flow — voice-to-text via a floating overlay bubble.
 
 ## Development Feedback Loop
 
@@ -56,7 +56,7 @@ source ./scripts/env-android.sh && ./gradlew :app:installDebug && "$ADB_BIN" -s 
 
 ```bash
 source ./scripts/env-android.sh
-"$ADB_BIN" -s 100.110.240.42:42533 logcat -s WisprOverlaySvc:* WisprA11y:* WisprIME:*
+"$ADB_BIN" -s 100.110.240.42:42533 logcat -s WhisperOverlaySvc:* WhisperA11y:* WhisperIME:*
 ```
 
 ## Wireless ADB

@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/env-android.sh"
 
 AVD_NAME="${AVD_NAME:-WhisperClient_API35}"
 APP_ID_DEBUG="com.wispr.client.debug"
-IME_ID="$APP_ID_DEBUG/com.wispr.client.ime.WisprInputMethodService"
+IME_ID="$APP_ID_DEBUG/com.wispr.client.ime.WhisperInputMethodService"
 
 EMULATOR_BIN="${ANDROID_SDK_ROOT}/emulator/emulator"
 

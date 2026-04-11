@@ -12,7 +12,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import java.lang.ref.WeakReference
 
-class WisprFocusAccessibilityService : AccessibilityService() {
+class WhisperFocusAccessibilityService : AccessibilityService() {
     private var lastEditableState: Boolean? = null
     private var bubbleServicePrimed = false
     private lateinit var overlayConfigStore: OverlayConfigStore
@@ -23,14 +23,14 @@ class WisprFocusAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         overlayConfigStore = OverlayConfigStore(this)
         instanceRef = WeakReference(this)
-        WisprFloatingBubbleService.sendCommand(this, WisprFloatingBubbleService.ACTION_START)
+        WhisperFloatingBubbleService.sendCommand(this, WhisperFloatingBubbleService.ACTION_START)
         bubbleServicePrimed = true
         Log.i(TAG, "Accessibility service connected")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!bubbleServicePrimed) {
-            WisprFloatingBubbleService.sendCommand(this, WisprFloatingBubbleService.ACTION_START)
+            WhisperFloatingBubbleService.sendCommand(this, WhisperFloatingBubbleService.ACTION_START)
             bubbleServicePrimed = true
         }
         var focusState = FocusEventEvaluator.evaluate(event, packageName)
@@ -91,11 +91,11 @@ class WisprFocusAccessibilityService : AccessibilityService() {
         }
         lastEditableState = visible
         val action = if (visible) {
-            WisprFloatingBubbleService.ACTION_FOCUS_EDITABLE
+            WhisperFloatingBubbleService.ACTION_FOCUS_EDITABLE
         } else {
-            WisprFloatingBubbleService.ACTION_FOCUS_NON_EDITABLE
+            WhisperFloatingBubbleService.ACTION_FOCUS_NON_EDITABLE
         }
-        WisprFloatingBubbleService.sendCommand(this, action)
+        WhisperFloatingBubbleService.sendCommand(this, action)
     }
 
     override fun onInterrupt() = Unit
@@ -197,10 +197,10 @@ class WisprFocusAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val TAG = "WisprA11y"
+        private const val TAG = "WhisperA11y"
         private const val HIDE_DEBOUNCE_MS = 450L
-        private var instanceRef: WeakReference<WisprFocusAccessibilityService>? = null
+        private var instanceRef: WeakReference<WhisperFocusAccessibilityService>? = null
 
-        fun getInstance(): WisprFocusAccessibilityService? = instanceRef?.get()
+        fun getInstance(): WhisperFocusAccessibilityService? = instanceRef?.get()
     }
 }

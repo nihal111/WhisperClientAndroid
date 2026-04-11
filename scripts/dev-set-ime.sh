@@ -10,7 +10,7 @@ if [[ ! -x "${ADB_BIN:-}" ]]; then
   exit 1
 fi
 
-IME_ID="com.wispr.client.debug/com.wispr.client.ime.WisprInputMethodService"
+IME_ID="com.wispr.client.debug/com.wispr.client.ime.WhisperInputMethodService"
 "$ADB_BIN" shell ime enable "$IME_ID"
 "$ADB_BIN" shell ime set "$IME_ID"
 

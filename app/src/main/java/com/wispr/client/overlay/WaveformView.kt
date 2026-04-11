@@ -47,19 +47,48 @@ class WaveformView(context: Context) : View(context) {
     }
 
     private var animationTime = 0f
+    private var currentAmplitude = 0f
+    private var maxSeenAmplitude = 0.15f // Start with a reasonable floor
     var isAnimating = false
         private set
 
     fun startAnimation() {
         isAnimating = true
         animationTime = 0f
+        currentAmplitude = 0f
+        maxSeenAmplitude = 0.15f
         invalidate()
     }
 
     fun stopAnimation() {
         isAnimating = false
         animationTime = 0f
+        currentAmplitude = 0f
         invalidate()
+    }
+
+    fun updateAmplitude(amplitude: Float) {
+        // Track the peak amplitude with slow decay for auto-gain effect
+        if (amplitude > maxSeenAmplitude) {
+            maxSeenAmplitude = amplitude
+        } else {
+            // Slowly decay the peak so we stay sensitive to quiet speech
+            maxSeenAmplitude = (maxSeenAmplitude * 0.992f).coerceAtLeast(0.15f)
+        }
+
+        // Normalize current amplitude against the peak (auto-gain)
+        val normalized = if (maxSeenAmplitude > 0f) {
+            (amplitude / maxSeenAmplitude).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
+        // Linear smoothing for visual stability
+        currentAmplitude = (currentAmplitude * 0.35f) + (normalized * 0.65f)
+        
+        if (isAnimating) {
+            invalidate()
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -81,13 +110,17 @@ class WaveformView(context: Context) : View(context) {
             val x = i * (barWidthPx + barGapPx)
 
             val barHeight = if (isAnimating) {
-                // Layer multiple sine waves for organic feel
+                // Layer multiple sine waves for organic texture
                 val wave1 = sin((animationTime * 5.5f + phaseOffsets[i] * 6.2f).toDouble()).toFloat()
                 val wave2 = sin((animationTime * 3.2f + phaseOffsets[i] * 4.1f + 1.3f).toDouble()).toFloat()
                 val wave3 = sin((animationTime * 7.8f + phaseOffsets[i] * 2.7f + 2.8f).toDouble()).toFloat()
-                val combined = (wave1 * 0.5f + wave2 * 0.3f + wave3 * 0.2f + 1f) / 2f // normalize to 0..1
-                val amplitude = minHeightFraction + (1f - minHeightFraction) * combined * envelope[i]
-                amplitude * maxBarHeight
+                val texture = (wave1 * 0.5f + wave2 * 0.3f + wave3 * 0.2f + 1f) / 2f // normalize to 0..1
+                
+                // Combine real-time amplitude with the texture and envelope
+                // We use a base minimum height + amplitude-driven growth
+                val scale = minHeightFraction + (1f - minHeightFraction) * currentAmplitude * texture
+                val finalScale = (scale * envelope[i]).coerceIn(minHeightFraction, 1.0f)
+                finalScale * maxBarHeight
             } else {
                 minHeightFraction * maxBarHeight
             }
@@ -99,7 +132,7 @@ class WaveformView(context: Context) : View(context) {
         }
 
         if (isAnimating) {
-            animationTime += 0.018f
+            animationTime += 0.015f
             postInvalidateOnAnimation()
         }
     }

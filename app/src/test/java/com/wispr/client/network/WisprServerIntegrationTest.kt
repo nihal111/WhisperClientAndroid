@@ -6,9 +6,9 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 
-class WisprServerIntegrationTest {
+class WhisperServerIntegrationTest {
 
-    private val client = WisprServerClient()
+    private val client = WhisperServerClient()
 
     @Test
     fun `transcribeAudio with real wav returns non-empty text`() = runBlocking {

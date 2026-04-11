@@ -1,10 +1,10 @@
 # WhisperClient Plan
 
-This repository tracks an Android client that captures speech, sends it to Wispr Server running on a Mac (`:3000`), receives text, and either inserts text into the focused field or copies it to clipboard.
+This repository tracks an Android client that captures speech, sends it to Whisper Server running on a Mac (`:3000`), receives text, and either inserts text into the focused field or copies it to clipboard.
 
 ## Product Goal
 
-Build an Android app with a fast local test loop that behaves like Wispr Flow, but targets a self-hosted Mac server endpoint.
+Build an Android app with a fast local test loop that behaves like Whisper Flow, but targets a self-hosted Mac server endpoint.
 
 ## Constraints
 

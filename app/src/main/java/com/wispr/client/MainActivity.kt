@@ -37,11 +37,11 @@ import androidx.compose.ui.unit.dp
 import com.wispr.client.overlay.AccessibilityPermission
 import com.wispr.client.overlay.OverlayConfigStore
 import com.wispr.client.overlay.OverlayPermission
-import com.wispr.client.overlay.WisprFloatingBubbleService
-import com.wispr.client.overlay.WisprFocusAccessibilityService
+import com.wispr.client.overlay.WhisperFloatingBubbleService
+import com.wispr.client.overlay.WhisperFocusAccessibilityService
 import com.wispr.client.data.ServerConfigStore
 import com.wispr.client.data.TranscriptStore
-import com.wispr.client.network.WisprServerClient
+import com.wispr.client.network.WhisperServerClient
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         val serverConfigStore = ServerConfigStore(this)
         val transcriptStore = TranscriptStore(this)
         val overlayConfigStore = OverlayConfigStore(this)
-        val serverClient = WisprServerClient()
+        val serverClient = WhisperServerClient()
 
         setContent {
             MaterialTheme {
@@ -72,15 +72,15 @@ class MainActivity : ComponentActivity() {
                             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         },
                         onStartBubbleService = {
-                            WisprFloatingBubbleService.sendCommand(
+                            WhisperFloatingBubbleService.sendCommand(
                                 this,
-                                WisprFloatingBubbleService.ACTION_START,
+                                WhisperFloatingBubbleService.ACTION_START,
                             )
                         },
                         onStopBubbleService = {
-                            WisprFloatingBubbleService.sendCommand(
+                            WhisperFloatingBubbleService.sendCommand(
                                 this,
-                                WisprFloatingBubbleService.ACTION_STOP,
+                                WhisperFloatingBubbleService.ACTION_STOP,
                             )
                         },
                     )
@@ -95,7 +95,7 @@ private fun SetupScreen(
     serverConfigStore: ServerConfigStore,
     transcriptStore: TranscriptStore,
     overlayConfigStore: OverlayConfigStore,
-    serverClient: WisprServerClient,
+    serverClient: WhisperServerClient,
     onOpenOverlaySettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onStartBubbleService: () -> Unit,
@@ -151,7 +151,7 @@ private fun SetupScreen(
         canDrawOverlay = OverlayPermission.canDraw(context)
         accessibilityEnabled = AccessibilityPermission.isServiceEnabled(
             context,
-            WisprFocusAccessibilityService::class.java,
+            WhisperFocusAccessibilityService::class.java,
         )
         showBubbleWithoutKeyboard = overlayConfigStore.getShowBubbleWithoutKeyboard()
     }
@@ -346,7 +346,7 @@ private fun SetupScreen(
                 canDrawOverlay = OverlayPermission.canDraw(context)
                 accessibilityEnabled = AccessibilityPermission.isServiceEnabled(
                     context,
-                    WisprFocusAccessibilityService::class.java,
+                    WhisperFocusAccessibilityService::class.java,
                 )
             },
             modifier = Modifier

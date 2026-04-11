@@ -16,7 +16,7 @@ import androidx.core.content.ContextCompat
 import com.wispr.client.R
 import com.wispr.client.data.ServerConfigStore
 import com.wispr.client.data.TranscriptStore
-import com.wispr.client.network.WisprServerClient
+import com.wispr.client.network.WhisperServerClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,11 +24,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
 
-class WisprInputMethodService : InputMethodService() {
+class WhisperInputMethodService : InputMethodService() {
     private val imeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var transcriptStore: TranscriptStore
     private lateinit var serverConfigStore: ServerConfigStore
-    private val serverClient = WisprServerClient()
+    private val serverClient = WhisperServerClient()
 
     private var mediaRecorder: MediaRecorder? = null
     private var currentAudioFile: File? = null
@@ -190,6 +190,6 @@ class WisprInputMethodService : InputMethodService() {
     }
 
     companion object {
-        private const val TAG = "WisprIme"
+        private const val TAG = "WhisperIme"
     }
 }

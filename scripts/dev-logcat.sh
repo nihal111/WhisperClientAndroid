@@ -10,4 +10,4 @@ if [[ ! -x "${ADB_BIN:-}" ]]; then
   exit 1
 fi
 
-"$ADB_BIN" logcat -v time WisprIme:I AndroidRuntime:E ActivityManager:I *:S
+"$ADB_BIN" logcat -v time WhisperIme:I AndroidRuntime:E ActivityManager:I *:S

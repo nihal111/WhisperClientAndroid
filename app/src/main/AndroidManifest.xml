@@ -28,12 +28,12 @@
         </activity>
 
         <service
-            android:name=".overlay.WisprFloatingBubbleService"
+            android:name=".overlay.WhisperFloatingBubbleService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
         <service
-            android:name=".overlay.WisprFocusAccessibilityService"
+            android:name=".overlay.WhisperFocusAccessibilityService"
             android:exported="true"
             android:label="@string/accessibility_service_name"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

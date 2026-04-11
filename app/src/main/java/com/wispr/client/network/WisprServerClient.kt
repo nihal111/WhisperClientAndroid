@@ -15,7 +15,7 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
-class WisprServerClient {
+class WhisperServerClient {
 
     suspend fun healthCheck(baseUrl: String, allowInsecureHttps: Boolean): Result<Int> = withContext(Dispatchers.IO) {
         val normalizedBase = normalizeBaseUrl(baseUrl)
