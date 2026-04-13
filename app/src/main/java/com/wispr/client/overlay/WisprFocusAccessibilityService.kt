@@ -56,14 +56,17 @@ class WhisperFocusAccessibilityService : AccessibilityService() {
 
         if (focusState == null) return
 
+        val imeVisible = isInputMethodWindowVisible()
+        val showWithoutKeyboard = overlayConfigStore.getShowBubbleWithoutKeyboard()
         val shouldShow = BubbleVisibilityPolicy.shouldShow(
             hasEditableTarget = focusState.hasEditableTarget,
             hasSensitiveTarget = focusState.hasSensitiveTarget,
-            imeWindowVisible = isInputMethodWindowVisible(),
-            showWithoutKeyboard = overlayConfigStore.getShowBubbleWithoutKeyboard(),
+            imeWindowVisible = imeVisible,
+            showWithoutKeyboard = showWithoutKeyboard,
             eventPackageName = focusState.packageName,
             ownPackageName = packageName,
         )
+        Log.d(TAG, "Visibility decision: editable=${focusState.hasEditableTarget} sensitive=${focusState.hasSensitiveTarget} imeVisible=$imeVisible showWithoutKeyboard=$showWithoutKeyboard -> shouldShow=$shouldShow")
         if (shouldShow) {
             mainHandler.removeCallbacks(delayedHide)
             setBubbleVisible(true)
@@ -191,9 +194,28 @@ class WhisperFocusAccessibilityService : AccessibilityService() {
     }
 
     private fun isInputMethodWindowVisible(): Boolean {
-        return windows.any { window ->
+        // Check for IME window in accessibility window list
+        val hasImeWindow = windows.any { window ->
             window.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD
         }
+
+        // Log all visible windows for debugging
+        val windowTypes = windows.map {
+            when(it.type) {
+                AccessibilityWindowInfo.TYPE_APPLICATION -> "APPLICATION"
+                AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "INPUT_METHOD"
+                AccessibilityWindowInfo.TYPE_SYSTEM -> "SYSTEM"
+                else -> "TYPE_${it.type}"
+            }
+        }.joinToString(", ")
+        Log.d(TAG, "Visible windows: [$windowTypes]")
+
+        if (hasImeWindow) {
+            Log.d(TAG, "Keyboard visible (IME window detected)")
+        } else {
+            Log.d(TAG, "Keyboard NOT visible (no IME window found)")
+        }
+        return hasImeWindow
     }
 
     companion object {

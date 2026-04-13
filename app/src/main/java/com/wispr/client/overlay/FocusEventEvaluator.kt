@@ -89,6 +89,10 @@ object FocusEventEvaluator {
     private fun inspectNode(node: AccessibilityNodeInfo): NodeScan {
         val editable = isProbablyEditable(node)
         if (!editable) {
+            android.util.Log.d(
+                "FocusEventEvaluator",
+                "Node not editable: class=${node.className} isEditable=${node.isEditable} inputType=${node.inputType} hint=${node.hintText} contentDesc=${node.contentDescription}"
+            )
             return NodeScan(hasEditable = false, hasSensitive = false)
         }
         return NodeScan(
@@ -102,8 +106,23 @@ object FocusEventEvaluator {
             return true
         }
         val className = node.className?.toString().orEmpty()
-        return className.contains("EditText", ignoreCase = true) ||
+        if (className.contains("EditText", ignoreCase = true) ||
             className.contains("TextInput", ignoreCase = true)
+        ) {
+            return true
+        }
+        // Check if node has text input action (handles Compose and other frameworks)
+        if (node.inputType != 0) {
+            return true
+        }
+        // Check parent nodes for Compose TextField (ComposeView hierarchy)
+        // If the focused node has a hint or content desc, it might be a text field
+        val hasHint = !node.hintText.isNullOrEmpty()
+        val hasContentDesc = !node.contentDescription.isNullOrEmpty()
+        if (hasHint || hasContentDesc) {
+            return true
+        }
+        return false
     }
 
     private fun isSensitiveField(node: AccessibilityNodeInfo): Boolean {

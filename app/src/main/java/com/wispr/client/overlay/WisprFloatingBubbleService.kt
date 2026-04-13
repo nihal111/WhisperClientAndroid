@@ -29,8 +29,10 @@ import com.wispr.client.data.TranscriptStore
 import com.wispr.client.network.WhisperServerClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -46,6 +48,7 @@ class WhisperFloatingBubbleService : Service() {
     private var bubbleView: LinearLayout? = null
     private var bubbleLayoutParams: WindowManager.LayoutParams? = null
     private var idleButton: ImageView? = null
+    private var copyButton: ImageView? = null
     private var recordingPanel: LinearLayout? = null
     private var waveformView: WaveformView? = null
     private var submitButton: ImageView? = null
@@ -56,6 +59,8 @@ class WhisperFloatingBubbleService : Service() {
     private var isRecording = false
     private var hasEditableFocus = false
     private var isInForeground = false
+    private var latestTranscriptForCopy: String? = null
+    private var copyActionHideJob: Job? = null
     private var amplitudePollingJob: kotlinx.coroutines.Job? = null
 
 
@@ -91,7 +96,7 @@ class WhisperFloatingBubbleService : Service() {
             }
             ACTION_FOCUS_NON_EDITABLE -> {
                 hasEditableFocus = false
-                if (!isRecording) {
+                if (!isRecording && !isCopyActionVisible()) {
                     hideBubble()
                 }
             }
@@ -134,6 +139,22 @@ class WhisperFloatingBubbleService : Service() {
             isClickable = true
             isFocusable = true
             setOnClickListener { startRecording() }
+        }
+
+        val copy = ImageView(this).apply {
+            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_copy_white))
+            setBackgroundResource(R.drawable.bubble_submit_bg)
+            layoutParams = LinearLayout.LayoutParams(44.dp(), 44.dp()).apply {
+                marginStart = 8.dp()
+            }
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val pad = 10.dp()
+            setPadding(pad, pad, pad, pad)
+            elevation = 6.dp().toFloat()
+            visibility = View.GONE
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { copyLatestTranscriptToClipboard() }
         }
 
         val cancel = ImageView(this).apply {
@@ -186,6 +207,7 @@ class WhisperFloatingBubbleService : Service() {
         }
 
         container.addView(idle)
+        container.addView(copy)
         container.addView(controls)
 
         val params = WindowManager.LayoutParams(
@@ -206,6 +228,7 @@ class WhisperFloatingBubbleService : Service() {
         bubbleView = container
         bubbleLayoutParams = params
         idleButton = idle
+        copyButton = copy
         recordingPanel = controls
         waveformView = waveform
         submitButton = submit
@@ -213,14 +236,20 @@ class WhisperFloatingBubbleService : Service() {
 
         container.post { applySnapToEdge() }
         setIdleMode()
+        if (!latestTranscriptForCopy.isNullOrBlank()) {
+            showCopyActionTemporarily()
+        }
     }
 
     private fun hideBubble() {
         val view = bubbleView ?: return
         runCatching { windowManager.removeView(view) }
+        copyActionHideJob?.cancel()
+        copyActionHideJob = null
         bubbleView = null
         bubbleLayoutParams = null
         idleButton = null
+        copyButton = null
         recordingPanel = null
         waveformView = null
         submitButton = null
@@ -228,6 +257,7 @@ class WhisperFloatingBubbleService : Service() {
     }
 
     private fun startRecording() {
+        clearCopyAction()
         if (!hasRecordAudioPermission()) {
             updateNotification("Mic permission required")
             return
@@ -273,6 +303,7 @@ class WhisperFloatingBubbleService : Service() {
     }
 
     private fun cancelRecording() {
+        clearCopyAction()
         if (!isRecording) {
             setIdleMode()
             return
@@ -291,6 +322,7 @@ class WhisperFloatingBubbleService : Service() {
     }
 
     private fun stopAndSubmitRecording() {
+        clearCopyAction()
         val recorder = mediaRecorder
         val audioFile = currentAudioFile
         if (recorder == null || audioFile == null) {
@@ -319,22 +351,23 @@ class WhisperFloatingBubbleService : Service() {
 
             result.fold(
                 onSuccess = { text ->
-                    transcriptStore.setLastTranscript(text)
+                    val transcript = text.trim()
+                    transcriptStore.setLastTranscript(transcript)
                     val didInsert = WhisperFocusAccessibilityService.getInstance()
-                        ?.insertTextIntoFocusedField(text)
+                        ?.insertTextIntoFocusedField(transcript)
                         ?: false
                     if (!didInsert) {
-                        copyToClipboard(text)
+                        copyToClipboard(transcript)
                     }
                     setIdleMode()
+                    latestTranscriptForCopy = transcript
+                    showCopyActionTemporarily()
                     updateNotification(if (didInsert) "Inserted transcript" else "Copied transcript")
                     exitForegroundIfNeeded()
-                    if (!hasEditableFocus) {
-                        hideBubble()
-                    }
                 },
                 onFailure = { error ->
                     Log.e(TAG, "Overlay transcription failed", error)
+                    clearCopyAction()
                     setIdleMode()
                     updateNotification("Transcription failed")
                     exitForegroundIfNeeded()
@@ -372,6 +405,7 @@ class WhisperFloatingBubbleService : Service() {
 
     private fun setTranscribingMode() {
         idleButton?.visibility = View.GONE
+        copyButton?.visibility = View.GONE
         recordingPanel?.visibility = View.VISIBLE
         submitButton?.apply { isEnabled = false; alpha = 0.4f; isClickable = false }
         cancelButton?.apply { isEnabled = false; alpha = 0.4f; isClickable = false }
@@ -390,6 +424,92 @@ class WhisperFloatingBubbleService : Service() {
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("WhisperClient", text))
     }
+
+    private fun showCopyActionTemporarily() {
+        if (latestTranscriptForCopy.isNullOrBlank()) {
+            return
+        }
+        placeCopyButtonNearMic()
+        copyButton?.visibility = View.VISIBLE
+        bubbleView?.post { applyClampToScreen() }
+        copyActionHideJob?.cancel()
+        copyActionHideJob = serviceScope.launch {
+            delay(COPY_ACTION_VISIBLE_MS)
+            clearCopyAction()
+            if (!hasEditableFocus && !isRecording) {
+                hideBubble()
+            }
+        }
+    }
+
+    private fun clearCopyAction() {
+        copyActionHideJob?.cancel()
+        copyActionHideJob = null
+        copyButton?.visibility = View.GONE
+        if (!isRecording) {
+            bubbleView?.post { applySnapToEdge() }
+        }
+        latestTranscriptForCopy = null
+    }
+
+    private fun copyLatestTranscriptToClipboard() {
+        val transcript = latestTranscriptForCopy?.trim().orEmpty()
+        if (transcript.isBlank()) {
+            clearCopyAction()
+            return
+        }
+        copyToClipboard(transcript)
+        updateNotification("Copied transcript")
+        clearCopyAction()
+        if (!hasEditableFocus && !isRecording) {
+            hideBubble()
+        }
+    }
+
+    private fun isCopyActionVisible(): Boolean {
+        return copyButton?.visibility == View.VISIBLE
+    }
+
+    private fun placeCopyButtonNearMic() {
+        val container = bubbleView ?: return
+        val copy = copyButton ?: return
+        val idle = idleButton ?: return
+        val copyLayoutParams = (copy.layoutParams as? LinearLayout.LayoutParams) ?: return
+        val idleIndex = container.indexOfChild(idle)
+        if (idleIndex == -1) return
+
+        val copyShouldBeLeftOfMic = isBubbleCloserToRightEdge()
+        val targetIndex = if (copyShouldBeLeftOfMic) idleIndex else idleIndex + 1
+        val currentIndex = container.indexOfChild(copy)
+
+        val spacing = 8.dp()
+        if (copyShouldBeLeftOfMic) {
+            copyLayoutParams.marginStart = 0
+            copyLayoutParams.marginEnd = spacing
+        } else {
+            copyLayoutParams.marginStart = spacing
+            copyLayoutParams.marginEnd = 0
+        }
+        copy.layoutParams = copyLayoutParams
+
+        if (currentIndex != targetIndex) {
+            if (currentIndex != -1) {
+                container.removeView(copy)
+            }
+            container.addView(copy, targetIndex.coerceIn(0, container.childCount))
+        }
+    }
+
+    private fun isBubbleCloserToRightEdge(): Boolean {
+        val params = bubbleLayoutParams ?: return false
+        val bubbleWidth = bubbleView?.width ?: return false
+        val screenWidth = resources.displayMetrics.widthPixels
+        val distanceToLeft = params.x
+        val distanceToRight = screenWidth - (params.x + bubbleWidth)
+        return distanceToRight <= distanceToLeft
+    }
+
+    private fun Int.dp(): Int = (this * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun releaseRecorder(deleteTempAudio: Boolean) {
         amplitudePollingJob?.cancel()
@@ -582,6 +702,7 @@ class WhisperFloatingBubbleService : Service() {
         private const val TAG = "WhisperOverlaySvc"
         private const val CHANNEL_ID = "wispr_overlay_channel"
         private const val NOTIFICATION_ID = 2001
+        private const val COPY_ACTION_VISIBLE_MS = 2500L
         fun sendCommand(context: Context, action: String) {
             val intent = Intent(context, WhisperFloatingBubbleService::class.java).setAction(action)
             try {

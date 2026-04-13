@@ -40,6 +40,7 @@ This is intentionally decoupled from the existing launcher screen recording flow
 - Foreground service hosting `TYPE_APPLICATION_OVERLAY` floating UI.
 - Drag-and-snap bubble position with persisted coordinates.
 - Idle state with single `Mic` action.
+- Post-transcription copy quick action shown next to `Mic` for a short timeout.
 - Recording state with animated waveform plus:
   - `✓` submit (stop + transcribe)
   - `✕` cancel (discard audio)
