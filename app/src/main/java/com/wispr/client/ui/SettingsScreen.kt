@@ -10,8 +10,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -35,6 +41,9 @@ import com.wispr.client.overlay.AccessibilityPermission
 import com.wispr.client.overlay.OverlayConfigStore
 import com.wispr.client.overlay.OverlayPermission
 import com.wispr.client.overlay.WhisperFocusAccessibilityService
+import com.wispr.client.ui.theme.GreenOk
+import com.wispr.client.ui.theme.RedError
+import com.wispr.client.ui.theme.TextTertiary
 import kotlinx.coroutines.launch
 
 @Composable
@@ -43,6 +52,7 @@ fun SettingsScreen(
     onOpenAccessibilitySettings: () -> Unit,
     onStartBubbleService: () -> Unit,
     onStopBubbleService: () -> Unit,
+    onShowSnackbar: suspend (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -52,7 +62,6 @@ fun SettingsScreen(
 
     var baseUrl by remember { mutableStateOf("") }
     var allowInsecureHttps by remember { mutableStateOf(true) }
-    var statusText by remember { mutableStateOf("Ready") }
     var canDrawOverlay by remember { mutableStateOf(false) }
     var accessibilityEnabled by remember { mutableStateOf(false) }
     var showBubbleWithoutKeyboard by remember { mutableStateOf(false) }
@@ -63,7 +72,7 @@ fun SettingsScreen(
         uri?.let {
             scope.launch {
                 val count = exportToUri(context, it)
-                statusText = "Exported $count sessions"
+                onShowSnackbar("Exported $count sessions")
             }
         }
     }
@@ -74,7 +83,7 @@ fun SettingsScreen(
         uri?.let {
             scope.launch {
                 val count = importFromUri(context, it)
-                statusText = "Imported $count sessions"
+                onShowSnackbar("Imported $count sessions")
             }
         }
     }
@@ -93,206 +102,236 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(16.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start,
     ) {
         Text(text = "Settings", style = MaterialTheme.typography.headlineMedium)
 
-        Text(
-            text = "Server Configuration",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 20.dp),
-        )
-
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            label = { Text("Server base URL") },
-            singleLine = true,
-        )
-
-        RowLine(
-            label = "Allow insecure HTTPS (self-signed cert)",
-            control = {
-                Switch(
-                    checked = allowInsecureHttps,
-                    onCheckedChange = { allowInsecureHttps = it },
-                )
-            },
-        )
-
-        Button(
-            onClick = {
-                serverConfigStore.setBaseUrl(baseUrl)
-                serverConfigStore.setAllowInsecureHttps(allowInsecureHttps)
-                statusText = "Saved config"
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Save Config")
-        }
-
-        Button(
-            onClick = {
-                scope.launch {
-                    statusText = "Checking server..."
-                    val result = serverClient.healthCheck(baseUrl, allowInsecureHttps)
-                    statusText = result.fold(
-                        onSuccess = { "Server reachable (HTTP $it)" },
-                        onFailure = { "Server check failed: ${it.message ?: "unknown error"}" },
-                    )
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Check Server")
-        }
-
-        Text(
-            text = "Overlay & Accessibility",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 20.dp),
-        )
-
-        Text(
-            text = "Overlay: ${if (canDrawOverlay) "granted" else "not granted"} | Accessibility: ${if (accessibilityEnabled) "enabled" else "disabled"}",
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        )
-
-        RowLine(
-            label = "Show bubble without keyboard",
-            control = {
-                Switch(
-                    checked = showBubbleWithoutKeyboard,
-                    onCheckedChange = { value ->
-                        showBubbleWithoutKeyboard = value
-                        overlayConfigStore.setShowBubbleWithoutKeyboard(value)
-                    },
-                )
-            },
-        )
-
-        Button(
-            onClick = onOpenOverlaySettings,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Open Overlay Permission")
-        }
-
-        Button(
-            onClick = onOpenAccessibilitySettings,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Open Accessibility Settings")
-        }
-
-        Button(
-            onClick = {
-                canDrawOverlay = OverlayPermission.canDraw(context)
-                accessibilityEnabled = AccessibilityPermission.isServiceEnabled(
-                    context,
-                    WhisperFocusAccessibilityService::class.java,
-                )
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Refresh Status")
-        }
-
-        Text(
-            text = "Backup",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 20.dp),
-        )
-
-        Button(
-            onClick = {
-                exportLauncher.launch("whisper-backup-${System.currentTimeMillis()}.json")
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Export data")
-        }
-
-        Button(
-            onClick = { importLauncher.launch(arrayOf("application/json")) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        ) {
-            Text("Import data")
-        }
-
-        Text(
-            text = "Note: Importing appends to existing data. Exported backup is a JSON file.",
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-
-        if (BuildConfig.DEBUG) {
-            Text(
-                text = "Debug",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 20.dp),
+        // Server Configuration Card
+        SettingsCard(title = "Server Configuration") {
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                label = { Text("Server base URL") },
+                singleLine = true,
             )
 
-            Button(
-                onClick = onStartBubbleService,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-            ) {
-                Text("Start Bubble Service")
-            }
+            SettingsSwitchRow(
+                label = "Allow insecure HTTPS",
+                checked = allowInsecureHttps,
+                onCheckedChange = { allowInsecureHttps = it },
+            )
 
-            Button(
-                onClick = onStopBubbleService,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Stop Bubble Service")
+                OutlinedButton(
+                    onClick = {
+                        serverConfigStore.setBaseUrl(baseUrl)
+                        serverConfigStore.setAllowInsecureHttps(allowInsecureHttps)
+                        scope.launch { onShowSnackbar("Config saved") }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Save")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val result = serverClient.healthCheck(baseUrl, allowInsecureHttps)
+                            val msg = result.fold(
+                                onSuccess = { "Server OK (HTTP $it)" },
+                                onFailure = { "Failed: ${it.message ?: "unknown"}" },
+                            )
+                            onShowSnackbar(msg)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Check")
+                }
             }
         }
 
+        // Overlay & Accessibility Card
+        SettingsCard(title = "Overlay & Accessibility") {
+            PermissionRow("Overlay", canDrawOverlay)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            PermissionRow("Accessibility", accessibilityEnabled)
+
+            SettingsSwitchRow(
+                label = "Show bubble without keyboard",
+                checked = showBubbleWithoutKeyboard,
+                onCheckedChange = { value ->
+                    showBubbleWithoutKeyboard = value
+                    overlayConfigStore.setShowBubbleWithoutKeyboard(value)
+                },
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onOpenOverlaySettings,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Overlay", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                }
+
+                OutlinedButton(
+                    onClick = onOpenAccessibilitySettings,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Accessibility", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        canDrawOverlay = OverlayPermission.canDraw(context)
+                        accessibilityEnabled = AccessibilityPermission.isServiceEnabled(
+                            context,
+                            WhisperFocusAccessibilityService::class.java,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Refresh", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                }
+            }
+        }
+
+        // Backup Card
+        SettingsCard(title = "Backup") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        exportLauncher.launch("whisper-backup-${System.currentTimeMillis()}.json")
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Export")
+                }
+
+                OutlinedButton(
+                    onClick = { importLauncher.launch(arrayOf("application/json")) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Import")
+                }
+            }
+
+            Text(
+                text = "Note: Importing appends to existing data.",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary,
+            )
+        }
+
+        // Debug Card (BuildConfig.DEBUG only)
+        if (BuildConfig.DEBUG) {
+            SettingsCard(title = "Debug") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 0.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onStartBubbleService,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Start Bubble", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                    }
+
+                    OutlinedButton(
+                        onClick = onStopBubbleService,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Stop Bubble", fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCard(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun PermissionRow(label: String, granted: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = if (granted) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+            contentDescription = null,
+            tint = if (granted) GreenOk else RedError,
+            modifier = Modifier.padding(end = 4.dp),
+        )
         Text(
-            text = statusText,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp),
+            text = "$label: ${if (granted) "granted" else "not granted"}",
             style = MaterialTheme.typography.bodySmall,
         )
     }
 }
 
 @Composable
-private fun RowLine(label: String, control: @Composable () -> Unit) {
+private fun SettingsSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(text = label, modifier = Modifier.weight(1f))
-        control()
+        Text(text = label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
     }
 }

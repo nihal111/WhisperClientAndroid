@@ -12,27 +12,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.wispr.client.ui.HomeScreen
 import com.wispr.client.ui.SettingsScreen
+import com.wispr.client.ui.theme.WhisperTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            WhisperTheme {
                 AppShell(
                     onOpenOverlaySettings = {
                         startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -67,8 +70,12 @@ private fun AppShell(
     onStopBubbleService: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(0) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
@@ -94,6 +101,9 @@ private fun AppShell(
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                     onStartBubbleService = onStartBubbleService,
                     onStopBubbleService = onStopBubbleService,
+                    onShowSnackbar = { message ->
+                        scope.launch { snackbarHostState.showSnackbar(message) }
+                    },
                 )
             }
         }

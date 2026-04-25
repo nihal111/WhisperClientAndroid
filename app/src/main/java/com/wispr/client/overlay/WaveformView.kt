@@ -24,7 +24,7 @@ class WaveformView(context: Context) : View(context) {
     private val cornerRadiusPx = cornerRadiusDp * density
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFFFFF.toInt()
+        color = 0xFF4A9EFF.toInt()
         style = Paint.Style.FILL
     }
 
