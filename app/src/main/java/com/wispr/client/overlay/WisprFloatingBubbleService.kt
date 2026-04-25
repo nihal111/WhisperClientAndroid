@@ -62,6 +62,8 @@ class WhisperFloatingBubbleService : Service() {
     private var latestTranscriptForCopy: String? = null
     private var copyActionHideJob: Job? = null
     private var amplitudePollingJob: kotlinx.coroutines.Job? = null
+    private var recordingStartedAt: Long = 0L
+    private var sourceAppAtRecordingStart: String? = null
 
 
     override fun onCreate() {
@@ -273,6 +275,8 @@ class WhisperFloatingBubbleService : Service() {
             recorder.prepare()
             recorder.start()
 
+            recordingStartedAt = System.currentTimeMillis()
+            sourceAppAtRecordingStart = WhisperFocusAccessibilityService.lastFocusedAppPackage
             mediaRecorder = recorder
             currentAudioFile = outputFile
             isRecording = true
@@ -304,6 +308,8 @@ class WhisperFloatingBubbleService : Service() {
 
     private fun cancelRecording() {
         clearCopyAction()
+        recordingStartedAt = 0L
+        sourceAppAtRecordingStart = null
         if (!isRecording) {
             setIdleMode()
             return
@@ -332,6 +338,10 @@ class WhisperFloatingBubbleService : Service() {
         }
 
         runCatching { recorder.stop() }
+        val durationMs = if (recordingStartedAt > 0) System.currentTimeMillis() - recordingStartedAt else 0L
+        val sourceApp = sourceAppAtRecordingStart
+        recordingStartedAt = 0L
+        sourceAppAtRecordingStart = null
         runCatching { recorder.release() }
         mediaRecorder = null
         isRecording = false
@@ -352,7 +362,12 @@ class WhisperFloatingBubbleService : Service() {
             result.fold(
                 onSuccess = { text ->
                     val transcript = text.trim()
-                    transcriptStore.setLastTranscript(transcript)
+                    com.wispr.client.data.SessionRecorder.record(
+                        this@WhisperFloatingBubbleService,
+                        transcript = transcript,
+                        durationMs = durationMs,
+                        sourceApp = sourceApp,
+                    )
                     val didInsert = WhisperFocusAccessibilityService.getInstance()
                         ?.insertTextIntoFocusedField(transcript)
                         ?: false

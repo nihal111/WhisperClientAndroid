@@ -56,6 +56,10 @@ class WhisperFocusAccessibilityService : AccessibilityService() {
 
         if (focusState == null) return
 
+        if (focusState.hasEditableTarget) {
+            focusState.packageName?.let { lastFocusedAppPackage = it }
+        }
+
         val imeVisible = isInputMethodWindowVisible()
         val showWithoutKeyboard = overlayConfigStore.getShowBubbleWithoutKeyboard()
         val shouldShow = BubbleVisibilityPolicy.shouldShow(
@@ -222,6 +226,7 @@ class WhisperFocusAccessibilityService : AccessibilityService() {
         private const val TAG = "WhisperA11y"
         private const val HIDE_DEBOUNCE_MS = 450L
         private var instanceRef: WeakReference<WhisperFocusAccessibilityService>? = null
+        @Volatile var lastFocusedAppPackage: String? = null
 
         fun getInstance(): WhisperFocusAccessibilityService? = instanceRef?.get()
     }

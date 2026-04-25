@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <include domain="database" path="whisper.db" />
+    <include domain="database" path="whisper.db-shm" />
+    <include domain="database" path="whisper.db-wal" />
+    <include domain="sharedpref" path="whisper_client.xml" />
+    <include domain="sharedpref" path="whisper_overlay.xml" />
+    <exclude domain="file" path="cache/" />
+</full-backup-content>

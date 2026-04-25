@@ -33,6 +33,7 @@ class WhisperInputMethodService : InputMethodService() {
     private var mediaRecorder: MediaRecorder? = null
     private var currentAudioFile: File? = null
     private var isRecording = false
+    private var recordingStartedAt: Long = 0L
 
     override fun onCreateInputView(): View {
         val view = LayoutInflater.from(this).inflate(R.layout.ime_view, null)
@@ -106,6 +107,7 @@ class WhisperInputMethodService : InputMethodService() {
             recorder.prepare()
             recorder.start()
 
+            recordingStartedAt = System.currentTimeMillis()
             mediaRecorder = recorder
             currentAudioFile = outputFile
             isRecording = true
@@ -129,6 +131,8 @@ class WhisperInputMethodService : InputMethodService() {
             return
         }
 
+        val durationMs = if (recordingStartedAt > 0) System.currentTimeMillis() - recordingStartedAt else 0L
+        recordingStartedAt = 0L
         try {
             recorder.stop()
         } catch (_: Exception) {
@@ -147,7 +151,12 @@ class WhisperInputMethodService : InputMethodService() {
 
             result.fold(
                 onSuccess = { text ->
-                    transcriptStore.setLastTranscript(text)
+                    com.wispr.client.data.SessionRecorder.record(
+                        this@WhisperInputMethodService,
+                        transcript = text,
+                        durationMs = durationMs,
+                        sourceApp = null,
+                    )
                     val outcome = TranscriptDelivery.deliver(
                         text = text,
                         textInserter = currentInputConnection?.let { input ->
