@@ -1,5 +1,6 @@
 package com.wispr.client.ui
 
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -260,11 +261,15 @@ private fun TranscriptHeader(label: String) {
 private fun TranscriptCard(session: SessionEntity, onCopy: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    val appName = remember(session.sourceApp) {
+        session.sourceApp?.let { getAppLabel(context, it) }
+    }
     val appIcon = remember(session.sourceApp) {
         session.sourceApp?.let { pkg ->
             try {
                 context.packageManager.getApplicationIcon(pkg).toBitmap().asImageBitmap()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }
@@ -275,27 +280,27 @@ private fun TranscriptCard(session: SessionEntity, onCopy: () -> Unit) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                appIcon?.let {
-                    androidx.compose.foundation.Image(
-                        bitmap = it,
-                        contentDescription = session.sourceApp,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(MaterialTheme.shapes.small),
-                        contentScale = ContentScale.Crop,
+                if (appName != null) {
+                    appIcon?.let {
+                        androidx.compose.foundation.Image(
+                            bitmap = it,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(MaterialTheme.shapes.small),
+                            contentScale = ContentScale.Crop,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = appName,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.weight(1f),
                     )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
-                Text(
-                    text = formatRelative(session.ts),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                SuggestionChip(
-                    onClick = {},
-                    label = { Text("${session.wordCount}w", fontSize = 9.sp) },
-                )
                 IconButton(
                     onClick = onCopy,
                     modifier = Modifier.size(32.dp),
@@ -303,11 +308,18 @@ private fun TranscriptCard(session: SessionEntity, onCopy: () -> Unit) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(18.dp))
                 }
             }
+
+            Text(
+                text = "${formatRelative(session.ts)} · ${session.wordCount} words · ${formatDuration(session.durationMs)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary,
+                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+            )
+
             Text(
                 session.transcript,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = if (expanded) Int.MAX_VALUE else 3,
-                modifier = Modifier.padding(top = 8.dp),
             )
             if (!expanded && session.transcript.lines().size > 3) {
                 TextButton(
@@ -363,3 +375,14 @@ private fun getDayLabel(ts: Long): String {
         else -> DateFormat.getDateInstance(DateFormat.SHORT).format(Date(ts))
     }
 }
+
+private fun formatDuration(ms: Long): String {
+    val s = ms / 1000
+    return if (s < 60) "${s}s" else "${s / 60}m ${s % 60}s"
+}
+
+private fun getAppLabel(context: Context, pkg: String): String =
+    try {
+        val info = context.packageManager.getApplicationInfo(pkg, 0)
+        context.packageManager.getApplicationLabel(info).toString()
+    } catch (_: Exception) { pkg }
